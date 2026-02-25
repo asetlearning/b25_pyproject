@@ -1,0 +1,23 @@
+# Created by: Alex Myasnikov
+# Date: February 10, 2026
+
+version: '3.8'
+
+services:
+  b25-experiments:
+    platform: linux/amd64
+    build: .
+    image: b25-experiments:latest
+    volumes:
+      # Mount data as read-only
+      - ./data/b25_nontrivial_relators_update_azsw1h6x_20260129.json:/app/data/b25_nontrivial_relators_update_azsw1h6x_20260129.json:ro
+      - ./data/kb_mixer_data:/app/data/kb_mixer_data:ro
+      # Mount output as read-write
+      - ./output:/app/output
+    # Override command for different experiments
+    command: ["experiments/rewrite_experiment.py",
+              "data/b25_nontrivial_relators_update_azsw1h6x_20260129.json",
+              "data/kb_mixer_data/shortlex",
+              "output/rewritten_relators.json",
+              "--log-file",
+              "output/experiment-some.log"]

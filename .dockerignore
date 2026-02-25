@@ -1,0 +1,47 @@
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output and data (mounted as volumes)
+output/
+data/b25_nontrivial_relators_update_azsw1h6x_20260129.json
+data/kb_mixer_data/
+
+# Tests (not needed in container)
+tests/
+
+# Documentation
+*.md
+README.md
+CLAUDE.md
+
+# OS
+.DS_Store
+Thumbs.db
