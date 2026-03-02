@@ -6,7 +6,8 @@ Created by: Alex Myasnikov
 Date: February 10, 2026
 """
 
-from typing import List
+import math
+from typing import List, Union
 
 
 def int_to_char(n: int) -> str:
@@ -73,3 +74,46 @@ def string_to_word(s: str) -> List[int]:
         ValueError: If any character invalid
     """
     return [char_to_int(c) for c in s]
+
+
+def word_inverse(word: str) -> str:
+    """Return group-theoretic inverse: reverse the string and swap case (a↔A, b↔B)."""
+    return word[::-1].swapcase()
+
+
+def word_power(word: str, n: Union[int, float]) -> str:
+    """Return the nth power of word (n full or fractional repetitions).
+
+    For integer n: returns word concatenated n times.
+    For fractional n: returns the prefix of length n*len(word) from the
+    infinite periodic repetition of word.
+
+    Args:
+        word: Base word over {a,b,A,B}
+        n: Exponent, must be >= 0. If float, n*len(word) must be an integer.
+
+    Returns:
+        String of length n*len(word)
+
+    Raises:
+        ValueError: if n < 0 or n*len(word) is not an integer
+
+    Examples:
+        >>> word_power("ab", 3)
+        'ababab'
+        >>> word_power("abab", 3.5)
+        'ababababababab'
+        >>> word_power("ab", 0)
+        ''
+    """
+    if n < 0:
+        raise ValueError(f"n must be >= 0, got {n}")
+
+    result_len_float = n * len(word)
+    result_len = round(result_len_float)
+    if abs(result_len_float - result_len) > 1e-9:
+        raise ValueError(
+            f"n * len(word) must be an integer, got {n} * {len(word)} = {result_len_float}"
+        )
+
+    return (word * math.ceil(n))[:result_len]

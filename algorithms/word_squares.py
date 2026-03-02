@@ -7,8 +7,10 @@ Date: February 10, 2026
 
 from typing import Set
 
+from tqdm import tqdm
 
-def find_squares(word: str) -> Set[str]:
+
+def find_squares(word: str, name: str | None = None) -> Set[str]:
     """
     Find all word squares (W² = WW) in the given word.
 
@@ -31,7 +33,7 @@ def find_squares(word: str) -> Set[str]:
     squares = set()
 
     # Try all possible substrings
-    for start in range(len(word)):
+    for start in tqdm(range(len(word)), desc=f"{name}: finding squares"):
         # For a square, length must be even and >= 4
         for length in range(4, len(word) - start + 1, 2):
             substring = word[start:start + length]

@@ -12,7 +12,8 @@ from algorithms.word_conversion import (
     int_to_char,
     word_to_string,
     char_to_int,
-    string_to_word
+    string_to_word,
+    word_power,
 )
 
 
@@ -98,3 +99,40 @@ def test_inverse_functions():
 
     for c in ['a', 'b', 'A', 'B']:
         assert int_to_char(char_to_int(c)) == c
+
+
+def test_word_power_integer():
+    assert word_power("ab", 3) == "ababab"
+    assert word_power("ab", 1) == "ab"
+    assert word_power("ab", 0) == ""
+
+
+def test_word_power_fractional():
+    assert word_power("abab", 3.5) == "abababababababab"[:14]
+    assert word_power("ab", 2.5) == "ababa"
+
+
+def test_word_power_non_integer_length_raises():
+    with pytest.raises(ValueError, match="must be an integer"):
+        word_power("abc", 1.5)  # 1.5 * 3 = 4.5 — not integer
+
+
+def test_word_power_negative_raises():
+    with pytest.raises(ValueError, match=">= 0"):
+        word_power("ab", -1)
+
+
+def test_word_power_length():
+    for n in [2, 3, 4]:
+        assert len(word_power("ab", n)) == 2 * n
+    assert len(word_power("abab", 3.5)) == 14
+
+
+def test_word_power_fractional_fp_noise():
+    # sub_len=5098, match_len=2550 → p*5098 = 22942 but float gives 22942.000000000004
+    sub_len = 5098
+    match_len = 2550
+    p = 4 + match_len / sub_len
+    word = "a" * sub_len
+    result = word_power(word, p)
+    assert len(result) == 22942
