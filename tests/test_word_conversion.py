@@ -14,6 +14,8 @@ from algorithms.word_conversion import (
     char_to_int,
     string_to_word,
     word_power,
+    freely_reduce,
+    cyclically_reduce,
 )
 
 
@@ -126,6 +128,70 @@ def test_word_power_length():
     for n in [2, 3, 4]:
         assert len(word_power("ab", n)) == 2 * n
     assert len(word_power("abab", 3.5)) == 14
+
+
+def test_freely_reduce_empty():
+    assert freely_reduce("") == ""
+
+
+def test_freely_reduce_no_cancellation():
+    assert freely_reduce("abab") == "abab"
+    assert freely_reduce("AB") == "AB"  # A,B are not inverses of each other
+    assert freely_reduce("abAb") == "abAb"
+
+
+def test_freely_reduce_single_pair():
+    assert freely_reduce("aA") == ""
+    assert freely_reduce("Aa") == ""
+    assert freely_reduce("bB") == ""
+    assert freely_reduce("Bb") == ""
+
+
+def test_freely_reduce_nested():
+    assert freely_reduce("aAbB") == ""   # aA→"", bB→""
+    assert freely_reduce("abBA") == ""   # bB cancels → "aA" → ""
+    assert freely_reduce("abaAb") == "abb"  # aA at pos 2-3 cancels
+
+
+def test_freely_reduce_middle():
+    # aAbAb: aA cancels → bAb (A and b not inverses)
+    assert freely_reduce("aAbAb") == "bAb"
+
+
+def test_cyclically_reduce_already_reduced():
+    assert cyclically_reduce("abab") == "abab"
+    assert cyclically_reduce("abaB") == "abaB"  # first=a, last=B: not inverses
+
+
+def test_cyclically_reduce_free_reduces_first():
+    assert cyclically_reduce("aAbB") == ""
+
+
+def test_cyclically_reduce_cyclic_cancellation():
+    # "abA": freely reduced; first=a, last=A → inverses → cancel → "b"
+    assert cyclically_reduce("abA") == "b"
+    # "Abba": freely reduced; first=A, last=a → inverses → cancel → "bb" → done
+    assert cyclically_reduce("Abba") == "bb"
+
+
+def test_cyclically_reduce_no_cyclic_cancel_after_free():
+    # "abBa": bB cancels → "aa"; first=a, last=a: not inverses → "aa"
+    assert cyclically_reduce("abBa") == "aa"
+
+
+def test_cyclically_reduce_multilevel():
+    # abbAbBABBA:
+    #   freely reduce → abbAABBA
+    #   a/A cancel → bbAABB → b/B cancel → bAAB → b/B cancel → AA
+    assert cyclically_reduce("abbAbBABBA") == "AA"
+
+
+def test_cyclically_reduce_empty():
+    assert cyclically_reduce("") == ""
+
+
+def test_cyclically_reduce_single():
+    assert cyclically_reduce("a") == "a"
 
 
 def test_word_power_fractional_fp_noise():

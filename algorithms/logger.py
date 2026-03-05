@@ -8,6 +8,7 @@ Date: February 10, 2026
 import logging
 import sys
 import json
+from logging.handlers import QueueHandler
 from typing import Optional
 from datetime import datetime
 
@@ -64,13 +65,21 @@ def configure_logging(log_file: Optional[str] = None) -> None:
 
     if log_file:
         # File handler only
-        handler = logging.FileHandler(log_file, mode='w')
+        handler = logging.FileHandler(log_file, mode='a')
     else:
         # Stdout handler
         handler = logging.StreamHandler(sys.stdout)
 
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
+
+
+def configure_logging_queue(queue) -> None:
+    """Configure worker-process logging to send records to a shared queue."""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.handlers.clear()
+    root_logger.addHandler(QueueHandler(queue))
 
 
 def get_logger(name: str) -> logging.Logger:

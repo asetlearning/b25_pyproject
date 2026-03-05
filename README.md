@@ -54,6 +54,26 @@ Logs output to stdout as JSON. Add `--log-file output/experiment.log` to write t
 {"timestamp": "2026-02-10T14:32:15.123456", "level": "INFO", "logger": "experiments.rewrite_experiment", "event": "relator_rewritten", "relator": "R1", "original_length": 100, "new_length": 85, "reduction": 15, "result": "shortened"}
 ```
 
+### Greedy Power Reduction Experiment
+
+Apply greedy power reduction to all relators:
+
+```bash
+python3 experiments/greedy_reduction_experiment.py \
+  data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
+  output.json
+```
+
+Use `--workers N` to run in parallel across N processes:
+
+```bash
+python3 experiments/greedy_reduction_experiment.py \
+  data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
+  output.json --workers 4
+```
+
+Add `--log-file output/experiment.log` to write logs to file instead of stdout.
+
 ### Word Squares Detection Experiment
 
 Detect all word squares (W² = WW) in relators:

@@ -81,6 +81,60 @@ def word_inverse(word: str) -> str:
     return word[::-1].swapcase()
 
 
+def freely_reduce(word: str) -> str:
+    """Freely reduce a word by canceling inverse pairs (aA, Aa, bB, Bb).
+
+    Repeatedly removes adjacent inverse letter pairs until none remain.
+
+    Args:
+        word: String over {a, b, A, B}
+
+    Returns:
+        Freely reduced string
+
+    Examples:
+        >>> freely_reduce("aAbB")
+        ''
+        >>> freely_reduce("abAb")
+        'abAb'
+        >>> freely_reduce("abaAb")
+        'ab'
+    """
+    stack = []
+    for c in word:
+        if stack and stack[-1] == c.swapcase():
+            stack.pop()
+        else:
+            stack.append(c)
+    return ''.join(stack)
+
+
+def cyclically_reduce(word: str) -> str:
+    """Cyclically reduce a word by freely reducing and then removing inverse first/last letters.
+
+    A word is cyclically reduced if it is freely reduced and its first and last
+    letters are not inverses of each other.
+
+    Args:
+        word: String over {a, b, A, B}
+
+    Returns:
+        Cyclically reduced string
+
+    Examples:
+        >>> cyclically_reduce("aAbB")
+        ''
+        >>> cyclically_reduce("abBa")
+        'b'
+        >>> cyclically_reduce("abab")
+        'abab'
+    """
+    word = freely_reduce(word)
+    while len(word) >= 2 and word[0] == word[-1].swapcase():
+        word = freely_reduce(word[1:-1])
+    return word
+
+
 def word_power(word: str, n: Union[int, float]) -> str:
     """Return the nth power of word (n full or fractional repetitions).
 

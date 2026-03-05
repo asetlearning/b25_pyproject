@@ -9,6 +9,8 @@ from typing import List, Tuple, Optional
 from tqdm import tqdm
 
 from algorithms.logger import get_logger
+from algorithms.word_conversion import freely_reduce, cyclically_reduce
+
 _logger = get_logger(__name__)
 
 class RewriteRule:
@@ -59,7 +61,7 @@ def apply_rule(word: str, rule: RewriteRule) -> Tuple[str, bool]:
     """
     changed = False
     while rule.lhs in word:
-        word = word.replace(rule.lhs, rule.rhs, 1)
+        word = cyclically_reduce(word.replace(rule.lhs, rule.rhs, 1))
         changed = True
     return word, changed
 
