@@ -9,10 +9,12 @@ The Burnside problem asks whether a finitely generated group in which every elem
 ## Structure
 
 ```
-├── data/          # Data sources and experimental results
-├── experiments/   # Experiment implementations
 ├── algorithms/    # Core algorithms for word processing
-└── requirements.txt
+├── data/          # Data sources and experimental results
+├── experiments/   # Experiment scripts
+├── ml/            # Machine learning components (BPE tokenizer)
+├── models/        # Saved model files
+└── tests/         # Unit tests
 ```
 
 ## Setup
@@ -73,6 +75,34 @@ python3 experiments/greedy_reduction_experiment.py \
 ```
 
 Add `--log-file output/experiment.log` to write logs to file instead of stdout.
+
+### BPE Tokenizer Training Experiment
+
+Train a Byte-Pair Encoding tokenizer on all relator words:
+
+```bash
+python3 experiments/bpe_train_experiment.py \
+  data/b25_nontrivial_relators_update_azsw1h6x_20260129.json
+```
+
+By default the model is saved to `models/tokenizer/bpe_model.json` with a vocabulary size of 1000. Both can be overridden:
+
+```bash
+python3 experiments/bpe_train_experiment.py \
+  data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
+  --output models/tokenizer/my_model.json \
+  --vocab-size 2000
+```
+
+The saved model can be loaded back with `BPETokenizerWords.from_file(path)`:
+
+```python
+from ml.bpe import BPETokenizerWords
+
+tokenizer = BPETokenizerWords.from_file("models/tokenizer/bpe_model.json")
+token_ids = tokenizer.encode("abABabAB")
+word = tokenizer.decode(token_ids)
+```
 
 ### Word Squares Detection Experiment
 

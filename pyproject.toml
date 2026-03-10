@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["algorithms*", "data*", "experiments*", "tests*"]
+include = ["algorithms*", "data*", "experiments*", "tests*", "ml*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
