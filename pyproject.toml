@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "b25_pyproject"
@@ -12,8 +12,9 @@ dependencies = [
     "tqdm>=4.0",
 ]
 
-[tool.setuptools.packages.find]
-include = ["algorithms*", "data*", "experiments*", "tests*", "ml*"]
+[tool.scikit-build]
+cmake.build-type = "Release"
+wheel.packages = ["algorithms", "data", "experiments", "ml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -10,6 +10,10 @@ The Burnside problem asks whether a finitely generated group in which every elem
 
 ```
 ├── algorithms/    # Core algorithms for word processing
+├── cpp/           # C++ pybind11 extension (tcgraph bindings)
+│   ├── tcgraph/   # git submodule: Todd-Coxeter graph library
+│   ├── bindings.cpp
+│   └── CMakeLists.txt
 ├── data/          # Data sources and experimental results
 ├── experiments/   # Experiment scripts
 ├── ml/            # Machine learning components (BPE tokenizer)
@@ -19,13 +23,35 @@ The Burnside problem asks whether a finitely generated group in which every elem
 
 ## Setup
 
+### Prerequisites
+
+The C++ extension requires cmake and a C++20 compiler:
+
 ```bash
+# Ubuntu/Debian
+sudo apt-get install cmake g++ ninja-build
+
+# macOS
+brew install cmake ninja
+```
+
+### Install
+
+```bash
+# Clone with submodules
+git clone --recurse-submodules <repo-url>
+cd b25_pyproject
+
+# Or, if already cloned:
+git submodule update --init --recursive
+
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Install project in editable mode
-pip install -e .
+# Install build deps and project (compiles C++ extension)
+pip install scikit-build-core pybind11 cmake
+pip install -e . --no-build-isolation
 ```
 
 ## Testing
@@ -37,6 +63,35 @@ python3 -m pytest tests/ -v
 ```
 
 ## Usage
+
+### Word Problem (tcgraph C++ extension)
+
+Test whether a word is trivial in B(2,5) using Todd-Coxeter approximation:
+
+```python
+from algorithms.word_problem import Word, construct_cayley_approximation
+
+# Generators: 1=a, 2=b, -1=A (a⁻¹), -2=B (b⁻¹)
+w = Word([1, 2, -1, -2])   # commutator [a,b]
+result = construct_cayley_approximation(w)
+# True  → word is trivial in B(2,5)
+# False → word is non-trivial
+# None  → inconclusive (coset bound reached)
+
+# Optional: raise coset bound (default 20_000_000)
+result = construct_cayley_approximation(w, coset_bound=50_000_000)
+```
+
+Word operations:
+```python
+w = Word([1, 2])       # ab
+v = w * Word([-1])     # abA
+u = -w                 # BA  (inverse)
+p = w ^ 3              # ababab
+w.reduce()             # free reduction
+len(w)                 # length
+w.get_letters()        # list of ints
+```
 
 ### Rewrite Rules Experiment
 
