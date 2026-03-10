@@ -5,14 +5,21 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y \
+    cmake g++ git ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy only code files (not data)
-COPY pyproject.toml ./
+COPY pyproject.toml CMakeLists.txt ./
+COPY cpp/ ./cpp/
 COPY algorithms/ ./algorithms/
 COPY data/relators_io.py data/__init__.py ./data/
 COPY experiments/ ./experiments/
 
+RUN git submodule update --init --recursive
+
 # Install dependencies
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e . --no-build-isolation
 
 # Create mount points for volumes
 RUN mkdir -p /app/data /app/output
