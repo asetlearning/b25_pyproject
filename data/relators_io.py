@@ -28,6 +28,15 @@ def load_relators(filepath: str) -> Dict:
     with open(filepath, 'r') as f:
         return json.load(f)
 
+def save_relators(filepath: str, data: dict):
+    """Save relators into JSON file.
+
+    Args:
+        filepath: Path to JSON file
+        data: Dict with relator data
+    """
+    with open(filepath, 'w') as f:
+        json.dump(data, f)
 
 def convert_to_strings(data: Dict) -> Dict:
     """Convert all word arrays to strings.
