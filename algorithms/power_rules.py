@@ -19,7 +19,7 @@ def create_power_rewrite_rule(word: str, p: float) -> RewriteRule:
     Raises:
         ValueError: if p not in (2.5, 5), or p * len(word) is not an integer
     """
-    if not (2.5 < p < 5):
+    if not (2.5 <= p < 5): # TODO: to accomodate same length powers
         raise ValueError(f"p must satisfy 2.5 < p < 5, got {p}")
 
     n = len(word)

@@ -17,7 +17,7 @@ def test_empty_string():
 
 
 def test_short_string():
-    """Strings shorter than 4 characters should return empty set."""
+    """Strings shorter than 2 chars should return empty set."""
     assert find_squares("a") == set()
     assert find_squares("ab") == set()
     assert find_squares("abc") == set()
@@ -31,14 +31,14 @@ def test_no_squares():
 
 def test_single_square():
     """String with single square (user example 1)."""
-    result = find_squares("abbaabbaBABaa")
-    assert result == {"abbaabba"}
+    result = find_squares("abbaabbaBABaa", show_progress=False)
+    assert result == {"abbaabba", "aa", "bb"}
 
 
 def test_multiple_squares():
     """String with multiple squares (user example 2)."""
-    result = find_squares("abbaabbaBABaaBaB")
-    assert result == {"abbaabba", "aBaB"}
+    result = find_squares("abbaabbaBABaaBaB", show_progress=False)
+    assert result == {"abbaabba", "aBaB", "aa", "bb"}
 
 
 def test_overlapping_squares():
@@ -48,14 +48,13 @@ def test_overlapping_squares():
     assert "abab" in result
 
 
-def test_trivial_squares_excluded():
-    """2-character squares should be excluded."""
-    result = find_squares("aabbAABB")
-    # Should not contain "aa", "bb", "AA", "BB"
-    assert "aa" not in result
-    assert "bb" not in result
-    assert "AA" not in result
-    assert "BB" not in result
+def test_2char_squares_included():
+    """2-character squares should be included."""
+    result = find_squares("aabbAABB", show_progress=False)
+    assert "aa" in result
+    assert "bb" in result
+    assert "AA" in result
+    assert "BB" in result
 
 
 def test_nested_squares():
@@ -87,6 +86,13 @@ def test_mixed_case_squares():
     result = find_squares("AbaBAbaB")
     # "AbaBAbaB" = "AbaB" + "AbaB"
     assert "AbaBAbaB" in result
+
+
+def test_single_char_base_square_detection():
+    """2-char squares enable single-char base discovery for greedy reduction."""
+    assert "aa" in find_squares("AAbaaabAAbaaabAAb", show_progress=False)
+    assert "aa" in find_squares("baabbAAABBBaabaaaBaaaBAABaaabaab", show_progress=False)
+    assert "bb" in find_squares("baabbAAABBBaabaaaBaaaBAABaaabaab", show_progress=False)
 
 
 def test_random_embedded_squares():

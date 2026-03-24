@@ -6,6 +6,7 @@ Date: February 10, 2026
 """
 
 import logging
+import os
 import sys
 import json
 from logging.handlers import QueueHandler
@@ -46,16 +47,28 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_data)
 
 
-def configure_logging(log_file: Optional[str] = None) -> None:
+def _resolve_level(level: Optional[str]) -> int:
+    """Resolve log level: explicit arg > LOG_LEVEL env var > ERROR."""
+    raw = level or os.environ.get('LOG_LEVEL')
+    if raw:
+        numeric = getattr(logging, raw.upper(), None)
+        if numeric is None:
+            raise ValueError(f"Unknown log level: {raw!r}")
+        return numeric
+    return logging.ERROR
+
+
+def configure_logging(log_file: Optional[str] = None, level: Optional[str] = None) -> None:
     """
     Configure global logging settings. Always outputs JSON format.
 
     Args:
-        log_file: If provided, log to file only (no stdout)
-                  If None, log to stdout
+        log_file: If provided, log to file only (no stdout); if None, log to stdout
+        level: Log level string ('debug','info','warning','error'). Falls back to
+               LOG_LEVEL env var, then ERROR.
     """
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(_resolve_level(level))
 
     # Clear existing handlers
     root_logger.handlers.clear()
@@ -74,10 +87,15 @@ def configure_logging(log_file: Optional[str] = None) -> None:
     root_logger.addHandler(handler)
 
 
-def configure_logging_queue(queue) -> None:
-    """Configure worker-process logging to send records to a shared queue."""
+def configure_logging_queue(queue, level: Optional[str] = None) -> None:
+    """Configure worker-process logging to send records to a shared queue.
+
+    Args:
+        queue: Shared multiprocessing queue.
+        level: Log level string. Falls back to LOG_LEVEL env var, then ERROR.
+    """
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(_resolve_level(level))
     root_logger.handlers.clear()
     root_logger.addHandler(QueueHandler(queue))
 
@@ -99,6 +117,16 @@ def get_logger(name: str) -> logging.Logger:
         configure_logging()
 
     return logger
+
+
+def add_log_level_arg(parser) -> None:
+    """Add --log-level argument to an argparse.ArgumentParser."""
+    parser.add_argument(
+        '--log-level',
+        default=None,
+        metavar='LEVEL',
+        help='Log level (debug/info/warning/error). Overrides LOG_LEVEL env var. Default: error.',
+    )
 
 
 def log_structured(logger: logging.Logger, level: str, **fields) -> None:

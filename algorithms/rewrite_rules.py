@@ -5,11 +5,11 @@ Created by: Alex Myasnikov
 Date: February 10, 2026
 """
 
-from typing import List, Tuple, Optional
+from typing import Generator, List, Tuple, Optional
 from tqdm import tqdm
 
 from algorithms.logger import get_logger
-from algorithms.word_conversion import freely_reduce, cyclically_reduce
+from algorithms.word_conversion import freely_reduce, cyclically_reduce, word_inverse
 
 _logger = get_logger(__name__)
 
@@ -22,6 +22,9 @@ class RewriteRule:
 
     def __repr__(self):
         return f"{self.lhs}->{self.rhs}"
+
+    def to_word(self) -> str:
+        return self.lhs + word_inverse(self.rhs)
 
 
 def parse_rules_file(filepath: str) -> List[RewriteRule]:
@@ -44,12 +47,26 @@ def parse_rules_file(filepath: str) -> List[RewriteRule]:
                 continue
 
             lhs, rhs = line.split('->', 1)
-            if len(lhs) < len(rhs):
-                _logger.error(f"Invalid rule: {line}")
-                continue
+            # if len(lhs) < len(rhs):
+            #     _logger.error(f"Invalid rule: {line}")
+            #     continue
             rules.append(RewriteRule(lhs, rhs))
 
     return rules
+
+
+def iter_rules_file(filepath: str) -> Generator[RewriteRule, None, None]:
+    """Parse rewrite rules from file lazily (generator). Same format as parse_rules_file."""
+    with open(filepath, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '->' not in line:
+                continue
+            lhs, rhs = line.split('->', 1)
+            # if len(lhs) < len(rhs):
+            #     _logger.error(f"Invalid rule: {line}")
+            #     continue
+            yield RewriteRule(lhs, rhs)
 
 
 def apply_rule(word: str, rule: RewriteRule) -> Tuple[str, bool]:

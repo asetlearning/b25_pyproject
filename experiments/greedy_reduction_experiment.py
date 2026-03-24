@@ -28,7 +28,7 @@ def _reduce_one(rel_name: str, rel_data: dict) -> dict:
     original_len = len(original_word)
     log_structured(logger, 'info', event='processing_relator', relator=rel_name)
     try:
-        reduced_word = greedy_reduce(original_word, rel_name)
+        reduced_word = greedy_reduce(original_word, rel_name, False)
         length_diff = original_len - len(reduced_word)
         if length_diff > 0:
             log_structured(logger, 'info', event='relator_shortened',
@@ -152,7 +152,8 @@ def run_greedy_reduction_parallel(
     relators_strings = convert_to_strings(relators_data)
 
     items = list(relators_strings.items())
-    batch_size = math.ceil(len(items) / workers)
+    # batch_size = math.ceil(len(items) / workers)
+    batch_size = 2
     batches = [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
 
     queue = multiprocessing.Manager().Queue(-1)

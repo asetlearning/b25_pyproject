@@ -10,7 +10,7 @@ from typing import Set
 from tqdm import tqdm
 
 
-def find_squares(word: str, name: str | None = None) -> Set[str]:
+def find_squares(word: str, name: str | None = None, show_progress: bool = True) -> Set[str]:
     """
     Find all word squares (W² = WW) in the given word.
 
@@ -21,21 +21,21 @@ def find_squares(word: str, name: str | None = None) -> Set[str]:
         word: Input word string
 
     Returns:
-        Set of all subwords that are squares, excluding trivial
-        2-character squares (aa, bb, etc.)
+        Set of all subwords that are squares, including 2-character
+        squares (aa, bb, etc.)
 
     Examples:
         >>> find_squares("abbaabbaBABaa")
-        {'abbaabba'}
+        {'abbaabba', 'aa'}
         >>> find_squares("abbaabbaBABaaBaB")
-        {'abbaabba', 'aBaB'}
+        {'abbaabba', 'aBaB', 'aa'}
     """
     squares = set()
 
     # Try all possible substrings
-    for start in tqdm(range(len(word)), desc=f"{name}: finding squares"):
-        # For a square, length must be even and >= 4
-        for length in range(4, len(word) - start + 1, 2):
+    for start in tqdm(range(len(word)), desc=f"{name}: finding squares", disable=not show_progress):
+        # For a square, length must be even and >= 2
+        for length in range(2, len(word) - start + 1, 2):
             substring = word[start:start + length]
             half = length // 2
 
