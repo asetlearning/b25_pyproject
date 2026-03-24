@@ -81,6 +81,36 @@ def word_inverse(word: str) -> str:
     return word[::-1].swapcase()
 
 
+def minimal_period(s: str) -> str:
+    """Return shortest p such that s == p * (len(s) // len(p)) (exact tiling).
+
+    Examples:
+        minimal_period("AAAA")  -> "A"
+        minimal_period("aBaB")  -> "aB"
+        minimal_period("abba")  -> "abba"
+    """
+    n = len(s)
+    for period_len in range(1, n // 2 + 1):
+        if n % period_len == 0:
+            period = s[:period_len]
+            if period * (n // period_len) == s:
+                return period
+    return s
+
+
+def cyclically_permute(w: str, n: int = 1) -> str:
+    """Return w rotated left by n positions.
+
+    Examples:
+        cyclically_permute("abcde", 2) -> "cdeab"
+        cyclically_permute("abcde", 0) -> "abcde"
+    """
+    if not w:
+        return w
+    n = n % len(w)
+    return w[n:] + w[:n]
+
+
 def freely_reduce(word: str) -> str:
     """Freely reduce a word by canceling inverse pairs (aA, Aa, bB, Bb).
 

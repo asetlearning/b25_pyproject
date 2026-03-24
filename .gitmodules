@@ -1,3 +1,4 @@
 [submodule "cpp/tcgraph"]
 	path = cpp/tcgraph
 	url = git@github.com:gt-computations/tcgraph.git
+    branch = main
