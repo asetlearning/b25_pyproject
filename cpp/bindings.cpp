@@ -9,6 +9,7 @@
 
 #include "word.h"
 #include "word_problem.h"
+#include "greedy_reduction.h"
 #include "logger.h"
 
 namespace py = pybind11;
@@ -31,7 +32,7 @@ PYBIND11_MODULE(tcgraph_ext, m) {
         } catch (const ShorterLengthFound& e) {
             // Include both the message and the reduced word in the exception text
             std::string msg = std::string(e.what()) + " | word: " + e.getWord().toString();
-            py_shorter_length_found->operator()(msg.c_str());
+            py::set_error(*py_shorter_length_found, msg.c_str());
         } catch (const std::exception& e) {
             PyErr_SetString(PyExc_RuntimeError, e.what());
         } catch (...) {
@@ -47,6 +48,8 @@ PYBIND11_MODULE(tcgraph_ext, m) {
         .def("size", &Word::size)
         .def("reduce", &Word::reduce)
         .def("is_cyclically_reduced", &Word::isCyclicallyReduced)
+        .def("cyclically_reduce", &Word::cyclicallyReduce)
+        .def("power", &Word::power, py::arg("p"))
         .def("to_string", &Word::toString)
         .def("to_gap_string", &Word::toGapString, py::arg("x"))
         .def("__len__", &Word::size)
@@ -58,10 +61,14 @@ PYBIND11_MODULE(tcgraph_ext, m) {
         .def("__str__", &Word::toString)
         .def("__eq__", &Word::operator==);
 
+
     m.def("attempt_to_decide_if_trivial",
           &attemptToDecideIfTrivial_in_B_2_5,
           py::arg("word"),
           py::arg("coset_bound") = 2000000,
+          py::arg("relator_max_length") = 5,
+          py::arg("log_step") = 10000000,
+          py::arg("len_log_step") = 100000000,
           py::call_guard<py::gil_scoped_release>(),
           R"doc(
 Attempt to decide if a word is trivial in B(2,5) by enumerating relators.
@@ -84,8 +91,7 @@ Returns: True (trivial), False (non-trivial), None (inconclusive).
           [](Word w, std::vector<Word> relators,
              const std::string& word_name,
              std::optional<std::string> check_point_file_name) {
-
-              return attemptToReduceUsingRelationsGreedy(w, relators, word_name, check_point_file_name);
+                return attemptToReduceUsingRelationsGreedy(w, relators, word_name, check_point_file_name);
           },
           py::arg("word"),
           py::arg("relators"),
@@ -97,4 +103,32 @@ Attempt to reduce word using the given relators (greedy strategy).
 Returns: True (trivial), False (non-trivial), None (inconclusive).
 Raises ShorterLengthFound if a shorter equivalent word is discovered.
           )doc");
+
+// Reductions using 2.5 powers method
+    m.def("greedy_reduce2_5",
+          &reduction2_5::greedyReduce,
+          py::arg("word"),
+          py::call_guard<py::gil_scoped_release>(),
+          R"doc(
+Cyclically reduces word, then applies greedy power-rewrite until no exponent > 2.5 remains.
+          )doc");
+
+    m.def("greedy_reduce_cyclic2_5",
+          &reduction2_5::greedyReduceCyclic,
+          py::arg("word"),
+          py::arg("fractions"),
+          py::call_guard<py::gil_scoped_release>(),
+          R"doc(
+Applies greedy_reduce2_5 to every cyclic permutation; returns shortest result.
+          )doc");
+
+    m.def("greedy_reduce_cyclic_exhaustive2_5",
+          &reduction2_5::greedyReduceCyclicExhaustive,
+          py::arg("word"),
+          py::arg("fractions"),
+          py::call_guard<py::gil_scoped_release>(),
+          R"doc(
+Repeatedly applies greedy_reduce_cyclic2_5 until no further reduction.
+          )doc");
+
 }
