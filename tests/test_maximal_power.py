@@ -242,10 +242,14 @@ def test_random_known_powers():
         # Verify the known power is detected
         found = False
         for substring, power_count, start_pos in result:
-            if substring == power_str and start_pos == len(prefix):
+            # The detected power may extend into prefix/suffix, so check that
+            # it covers the embedded power_str at the right relative offset.
+            offset = len(prefix) - start_pos
+            if (0 <= offset <= len(substring) - len(power_str)
+                    and substring[offset:offset + len(power_str)] == power_str):
                 found = True
                 expected_power = reps + (frac_len / sub_len)
-                assert abs(power_count - expected_power) < 0.001
+                assert power_count >= expected_power - 0.001
                 break
 
         assert found, f"Iteration {iteration}: Expected power '{power_str}' not found"

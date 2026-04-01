@@ -18,6 +18,7 @@ from tqdm import tqdm
 from algorithms.greedy_reduction import greedy_reduce
 from algorithms.logger import get_logger, configure_logging, configure_logging_queue, log_structured, JsonFormatter
 from data.relators_io import load_relators, convert_to_strings, convert_to_integers
+from algorithms.word_problem import greedy_reduce2_5
 
 logger = get_logger(__name__)
 
@@ -28,7 +29,11 @@ def _reduce_one(rel_name: str, rel_data: dict) -> dict:
     original_len = len(original_word)
     log_structured(logger, 'info', event='processing_relator', relator=rel_name)
     try:
-        reduced_word = greedy_reduce(original_word, rel_name, False)
+        # Uncomment for python implementation
+        # reduced_word = greedy_reduce(original_word, rel_name, False)
+        reduced_word = greedy_reduce2_5(original_word)
+        # reduced_word = greedy_reduce_cyclic_exhaustive2_5(original_word)
+
         length_diff = original_len - len(reduced_word)
         if length_diff > 0:
             log_structured(logger, 'info', event='relator_shortened',
@@ -193,7 +198,7 @@ def run_greedy_reduction_parallel(
     return stats
 
 
-if __name__ == "__main__":
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Greedy power reduction on relators")
@@ -211,3 +216,9 @@ if __name__ == "__main__":
     else:
         configure_logging(args.log_file)
         run_greedy_reduction(args.relators_file, args.output_file)
+
+if __name__ == "__main__":
+    # from algorithms.word_problem import greedy_reduce_cyclic_exhaustive2_5
+    # reduced_word = greedy_reduce_cyclic_exhaustive2_5("bAAAAAAAAAb")
+    # print(reduced_word)
+    main()

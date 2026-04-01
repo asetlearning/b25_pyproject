@@ -46,10 +46,42 @@ def attempt_to_reduce_using_relations_greedy(
 def attempt_to_decide_if_trivial(
     word: "_ext.Word | str",
     coset_bound: int = 20_000_000,
+    relator_max_length: int = 5,
+    log_step: int = 10_000_000,
+    len_log_step: int = 100_000_000,
 ) -> "bool | None":
     if isinstance(word, str):
         word = _ext.Word(string_to_word(word))
-    return _ext.attempt_to_decide_if_trivial(word, coset_bound)
+    return _ext.attempt_to_decide_if_trivial(word, coset_bound, relator_max_length, log_step, len_log_step)
 
 
-__all__ = ["Word", "word_from_str", "word_to_str", "attempt_to_reduce_using_relations", "attempt_to_reduce_using_relations_greedy", "attempt_to_decide_if_trivial"]
+def greedy_reduce2_5(word: "_ext.Word | str") -> "_ext.Word":
+    if isinstance(word, str):
+        word = _ext.Word(string_to_word(word))
+    # Have to return string because Word is not pickable by default
+    return word_to_str(_ext.greedy_reduce2_5(word))
+
+
+def greedy_reduce_cyclic2_5(word: "_ext.Word | str") -> "_ext.Word":
+    if isinstance(word, str):
+        word = _ext.Word(string_to_word(word))
+    # Have to return string because Word is not pickable by default
+    return word_to_str(_ext.greedy_reduce_cyclic2_5(word))
+
+
+def greedy_reduce_cyclic_exhaustive2_5(word: "_ext.Word | str") -> "_ext.Word":
+    if isinstance(word, str):
+        word = _ext.Word(string_to_word(word))
+    # Have to return string because Word is not pickable by default
+    return word_to_str(_ext.greedy_reduce_cyclic_exhaustive2_5(word))
+
+
+__all__ = [
+    "Word", "word_from_str", "word_to_str",
+    "attempt_to_reduce_using_relations",
+    "attempt_to_reduce_using_relations_greedy",
+    "attempt_to_decide_if_trivial",
+    "greedy_reduce2_5",
+    "greedy_reduce_cyclic2_5",
+    "greedy_reduce_cyclic_exhaustive2_5",
+]

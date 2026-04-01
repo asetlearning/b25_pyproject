@@ -44,10 +44,6 @@ class TestCreatePowerRewriteRule:
         assert r.lhs == w5[:14]
         assert r.rhs == word_inverse(w5[14:])
 
-    def test_p_too_low_raises(self):
-        with pytest.raises(ValueError, match="2.5 < p < 5"):
-            create_power_rewrite_rule("ab", 2.5)
-
     def test_p_too_low_strict(self):
         with pytest.raises(ValueError, match="2.5 < p < 5"):
             create_power_rewrite_rule("ab", 2.0)

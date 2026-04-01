@@ -77,7 +77,11 @@ def _greedy_reduce(word: str, name: str, show_progress: bool) -> str:
         if n >= 1:
             # W^(5n) -> ""; loop reduces 5 copies per iteration; q handled in next iteration
             rule = RewriteRule(lhs=word_power(best_base, 5), rhs="")
-        elif q >= 2.5:  # TODO: allow same length words
+            new_word, changed = apply_rule(current, rule)
+            if changed:
+                current = new_word
+
+        if q >= 2.5:  # TODO: allow same length words
             rule = create_power_rewrite_rule(best_base, q)
         else:
             break  # no useful rule
