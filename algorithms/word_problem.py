@@ -55,25 +55,25 @@ def attempt_to_decide_if_trivial(
     return _ext.attempt_to_decide_if_trivial(word, coset_bound, relator_max_length, log_step, len_log_step)
 
 
-def greedy_reduce2_5(word: "_ext.Word | str") -> "_ext.Word":
+def greedy_reduce2_5(word: "_ext.Word | str") -> str:
     if isinstance(word, str):
         word = _ext.Word(string_to_word(word))
     # Have to return string because Word is not pickable by default
     return word_to_str(_ext.greedy_reduce2_5(word))
 
 
-def greedy_reduce_cyclic2_5(word: "_ext.Word | str") -> "_ext.Word":
+def greedy_reduce_cyclic2_5(word: "_ext.Word | str", fractions=None) -> str:
     if isinstance(word, str):
         word = _ext.Word(string_to_word(word))
     # Have to return string because Word is not pickable by default
-    return word_to_str(_ext.greedy_reduce_cyclic2_5(word))
+    return word_to_str(_ext.greedy_reduce_cyclic2_5(word, fractions))
 
 
-def greedy_reduce_cyclic_exhaustive2_5(word: "_ext.Word | str") -> "_ext.Word":
+def greedy_reduce_cyclic_exhaustive2_5(word: "_ext.Word | str", fractions=None) -> str:
     if isinstance(word, str):
         word = _ext.Word(string_to_word(word))
     # Have to return string because Word is not pickable by default
-    return word_to_str(_ext.greedy_reduce_cyclic_exhaustive2_5(word))
+    return word_to_str(_ext.greedy_reduce_cyclic_exhaustive2_5(word, fractions))
 
 
 __all__ = [

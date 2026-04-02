@@ -16,9 +16,11 @@ from typing import Dict, Any
 from tqdm import tqdm
 
 from algorithms.greedy_reduction import greedy_reduce
-from algorithms.logger import get_logger, configure_logging, configure_logging_queue, log_structured, JsonFormatter
+from algorithms.logger import get_logger, configure_logging, configure_logging_queue, log_structured, \
+    JsonFormatter
+from algorithms.word_conversion import freely_reduce, cyclically_reduce
 from data.relators_io import load_relators, convert_to_strings, convert_to_integers
-from algorithms.word_problem import greedy_reduce2_5
+from algorithms.word_problem import greedy_reduce2_5, greedy_reduce_cyclic_exhaustive2_5
 
 logger = get_logger(__name__)
 
@@ -31,8 +33,8 @@ def _reduce_one(rel_name: str, rel_data: dict) -> dict:
     try:
         # Uncomment for python implementation
         # reduced_word = greedy_reduce(original_word, rel_name, False)
-        reduced_word = greedy_reduce2_5(original_word)
-        # reduced_word = greedy_reduce_cyclic_exhaustive2_5(original_word)
+        #reduced_word = greedy_reduce2_5(cyclically_reduce(original_word))
+        reduced_word = greedy_reduce_cyclic_exhaustive2_5(original_word, [0, 0.25, 0.5, 0.75])
 
         length_diff = original_len - len(reduced_word)
         if length_diff > 0:
@@ -205,17 +207,21 @@ def main():
     parser.add_argument("relators_file", help="JSON file with relators")
     parser.add_argument("output_file", help="Where to save results")
     parser.add_argument("--log-file", help="Log to file (default: stdout)")
+    parser.add_argument("--log-level",
+                        choices=["error", "warning", "info", "debug"],
+                        help="Log level: error|warning|info|debug (default: error)")
     parser.add_argument("--workers", type=int, default=1,
                         help="Number of worker processes (default: 1)")
 
     args = parser.parse_args()
 
     if args.workers > 1:
-        configure_logging()  # main process logs to stdout; listener owns the file
+        configure_logging(level=args.log_level)  # main process logs to stdout; listener owns the file
         run_greedy_reduction_parallel(args.relators_file, args.output_file, args.workers, args.log_file)
     else:
-        configure_logging(args.log_file)
+        configure_logging(args.log_file, args.log_level)
         run_greedy_reduction(args.relators_file, args.output_file)
+
 
 if __name__ == "__main__":
     # from algorithms.word_problem import greedy_reduce_cyclic_exhaustive2_5
