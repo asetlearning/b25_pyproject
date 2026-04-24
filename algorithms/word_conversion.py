@@ -165,6 +165,27 @@ def cyclically_reduce(word: str) -> str:
     return word
 
 
+_SHORTLEX_RANK = {'a': 0, 'A': 1, 'b': 2, 'B': 3}
+
+
+def shortlex_compare(w1: str, w2: str) -> int:
+    """Compare two words using shortlex ordering with a < A < b < B.
+
+    Shorter words precede longer ones; equal-length words are compared
+    character-by-character using the alphabet order a < A < b < B.
+
+    Returns:
+        -1 if w1 < w2, 0 if w1 == w2, 1 if w1 > w2
+    """
+    if len(w1) != len(w2):
+        return -1 if len(w1) < len(w2) else 1
+    for c1, c2 in zip(w1, w2):
+        r1, r2 = _SHORTLEX_RANK[c1], _SHORTLEX_RANK[c2]
+        if r1 != r2:
+            return -1 if r1 < r2 else 1
+    return 0
+
+
 def word_power(word: str, n: Union[int, float]) -> str:
     """Return the nth power of word (n full or fractional repetitions).
 

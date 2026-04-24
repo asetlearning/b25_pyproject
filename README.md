@@ -62,6 +62,16 @@ Run tests:
 python3 -m pytest tests/ -v
 ```
 
+Verify words are trivial in $\bar{B}(2,5)$ using **gap**:
+
+from the folder with gap script and relators file:
+```bash
+gap docker run -it -v "$PWD:/work" gap bash
+cd /work/
+gap -b -q -c 'json_file := "b25_challenge_original_2.5reduced_cyclic4_20260402.json"; Read("verify_b25_relators.gap");'
+```
+
+
 ## Usage
 
 ### Word Problem (tcgraph C++ extension)
