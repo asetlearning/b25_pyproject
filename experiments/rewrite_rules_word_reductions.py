@@ -298,6 +298,6 @@ if __name__ == "__main__":
     # #         "version": "0",
     # #         "word": r
     # #     }
-    # # with open("reduced_rules.json", "w") as f:
+    # # with open("test_relators.json", "w") as f:
     # #     json.dump(reduced_rules_set_json, f)
     # print("\n".join(sorted(set(reduced_list), key=len)))
