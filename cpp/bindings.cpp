@@ -14,6 +14,8 @@
 
 namespace py = pybind11;
 
+void init_pattern_boost(py::module_& m);
+
 // Must be at module scope so the Python exception type lives long enough
 static py::exception<ShorterLengthFound>* py_shorter_length_found = nullptr;
 
@@ -44,6 +46,7 @@ PYBIND11_MODULE(tcgraph_ext, m) {
         .def(py::init<>())
         .def(py::init<std::vector<int>>())
         .def(py::init<int>())
+        .def(py::init<std::string>())
         .def("get_letters", &Word::getLetters)
         .def("size", &Word::size)
         .def("reduce", &Word::reduce)
@@ -131,4 +134,5 @@ Applies greedy_reduce2_5 to every cyclic permutation; returns shortest result.
 Repeatedly applies greedy_reduce_cyclic2_5 until no further reduction.
           )doc");
 
+    init_pattern_boost(m);
 }
