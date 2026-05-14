@@ -1,5 +1,15 @@
 # Project: Burnside Problem B(2,5)
 
+## Tooling
+
+- Package manager: **uv** (migrated from poetry 2026-05-14)
+- Build backend: `scikit-build-core` (C++ tcgraph extension via pybind11)
+- Python: 3.12 (pinned in `.python-version`)
+- Setup: `uv sync` — creates `.venv/`, installs deps, builds C++ ext
+- Tests: `uv run pytest tests/ -v`
+- Dep groups: `dev` (pytest), `build` (scikit-build-core, pybind11, cmake, ninja)
+- Docker: `uv:latest` from ghcr, keeps `--no-build-isolation`
+
 ## Word Conversion System
 
 Implemented Feb 10, 2026.
@@ -44,4 +54,4 @@ result = convert_to_integers(strings, data, details={"R1": "simplified"})
 
 ### Dependencies
 
-Added to `requirements.txt`: `pytest>=7.0`
+`pytest>=7.0` in `[dependency-groups].dev` of `pyproject.toml` (uv).
