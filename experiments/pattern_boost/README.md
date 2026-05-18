@@ -152,7 +152,7 @@ results = [searcher.search(fw, seed=42 + i) for i, fw in enumerate(samples)]
 
 **Run:**
 ```bash
-uv run python experiments/pattern_boost/experiment1_local_search.py
+uv run python experiments/pattern_boost/experiment_local_search.py
 ```
 
 **Output:** per-sample before/after score table, aggregate stats, exact-match check, top-3 results.

@@ -1,0 +1,9 @@
+# Created by: Alex Myasnikov
+# Date: May 15, 2026
+#
+# Configuration for experiments/bpe_train_experiment.py
+
+relators_file: data/b25_nontrivial_relators_update_azsw1h6x_20260129.json
+output: models/tokenizer/bpe_model.json
+vocab_size: 1000
+alphabet: ['a', 'b', 'A', 'B']

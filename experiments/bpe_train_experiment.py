@@ -3,41 +3,64 @@ Experiment: Train BPE tokenizer on all relator words.
 
 Created by: Alex Myasnikov
 Date: March 7, 2026
+
+Usage:
+    python -m experiments.bpe_train_experiment <config.yaml>
+
+See configs/bpe_train.yaml for the schema.
 """
 
-import os
 import argparse
+import logging
+import os
+from pathlib import Path
 
+import yaml
+
+from algorithms.logger import configure_logging, log_structured
 from data.relators_io import load_relators, convert_to_strings
 from ml.bpe import BPETokenizerWords
 
-ALPHABET = ['a', 'b', 'A', 'B']
-DEFAULT_VOCAB_SIZE = 1000
-DEFAULT_OUTPUT = "models/tokenizer/bpe_model.json"
+DEFAULT_CONFIG = Path('configs/bpe_train.yaml')
 
 
-def train_tokenizer(relators_file: str, output_path: str, vocab_size: int) -> None:
+def train_tokenizer(cfg: dict, logger: logging.Logger) -> None:
+    relators_file = cfg['relators_file']
+    output_path = cfg['output']
+    vocab_size = cfg['vocab_size']
+    alphabet = cfg['alphabet']
+
     relators_data = load_relators(relators_file)
     relators_strings = convert_to_strings(relators_data)
+    word_list = [rel['word'] for rel in relators_strings.values()]
+    log_structured(logger, 'info', event='bpe_train_corpus_loaded',
+                   relators=len(word_list))
 
-    # Extract word strings (values of "word" key)
-    word_list = [rel["word"] for rel in relators_strings.values()]
-
-    tokenizer = BPETokenizerWords(ALPHABET)
+    tokenizer = BPETokenizerWords(alphabet)
     tokenizer.train(word_list, vocab_size)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     tokenizer.save(output_path)
+    log_structured(logger, 'info', event='bpe_train_done',
+                   output=output_path, vocab_size=len(tokenizer.vocab))
     print(f"Saved tokenizer to {output_path} (vocab size: {len(tokenizer.vocab)})")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train BPE tokenizer on relators")
-    parser.add_argument("relators_file", help="JSON file with relators")
-    parser.add_argument("--output", default=DEFAULT_OUTPUT,
-                        help=f"Output path for model (default: {DEFAULT_OUTPUT})")
-    parser.add_argument("--vocab-size", type=int, default=DEFAULT_VOCAB_SIZE,
-                        help=f"BPE vocabulary size (default: {DEFAULT_VOCAB_SIZE})")
+def main():
+    parser = argparse.ArgumentParser(description='Train BPE tokenizer on relators')
+    parser.add_argument('config', type=Path, nargs='?', default=DEFAULT_CONFIG,
+                        help=f'YAML config path (default: {DEFAULT_CONFIG})')
     args = parser.parse_args()
 
-    train_tokenizer(args.relators_file, args.output, args.vocab_size)
+    cfg = yaml.safe_load(args.config.read_text())
+
+    configure_logging(level='info')
+    logger = logging.getLogger('bpe_train_experiment')
+    log_structured(logger, 'info', event='bpe_train_start',
+                   config_path=str(args.config), config=cfg)
+
+    train_tokenizer(cfg, logger)
+
+
+if __name__ == '__main__':
+    main()
