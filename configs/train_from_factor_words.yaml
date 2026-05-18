@@ -1,0 +1,44 @@
+# Created by: Alex Myasnikov
+# Date: May 15, 2026
+#
+# Configuration for experiments/pattern_boost/train_from_factor_words.py
+# (Phase 1 supplementary script: tokenize + train + sample FactoredWords).
+
+# Exactly one of `input` / `generate_initial` should be active.
+input: output/pb_generate_local_search_data/20260515/results_edit_b10_s10_n5000.json             # path to JSON list of FactoredWord entries (pb.to_json format), or null
+generate_initial: 1000   # used when input is null; set to 0 to require --input
+output_dir: output/pb_train_from_factor_words
+seed: 42
+
+relators:
+  num_generators: 2
+  max_relator_len: 5
+
+tokenizer:
+  use_bpe: false
+  vocab_size: 256        # only used when use_bpe is true
+
+model:
+  n_layer: 4
+  n_head: 4
+  n_embd: 256
+  n_positions: 512
+
+training:
+  epochs: 100
+  batch_size: 16
+  lr: 5.0e-4
+
+sampling:
+  num_samples_out: 100
+  temperature: 1.0
+  top_k: 50
+  top_p: 0.95
+
+scoring:
+  challenges: experiments/pattern_boost/test_relators_1.json       # optional relators_io-style JSON; when set, sampled.jsonl gets a "score" field
+  type: edit        # hellinger | hamming | edit
+
+logging:
+  level: info
+  file: null             # null -> output_dir/run.jsonl

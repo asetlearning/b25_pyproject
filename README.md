@@ -37,6 +37,8 @@ brew install cmake ninja
 
 ### Install
 
+Uses [uv](https://docs.astral.sh/uv/) for env/dep management.
+
 ```bash
 # Clone with submodules
 git clone --recurse-submodules <repo-url>
@@ -45,13 +47,11 @@ cd b25_pyproject
 # Or, if already cloned:
 git submodule update --init --recursive
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Install uv if missing
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install build deps and project (compiles C++ extension)
-pip install scikit-build-core pybind11 cmake
-pip install -e . --no-build-isolation
+# Create .venv, install deps, build C++ extension
+uv sync
 ```
 
 ## Testing
@@ -59,7 +59,7 @@ pip install -e . --no-build-isolation
 Run tests:
 
 ```bash
-python3 -m pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 Verify words are trivial in $\bar{B}(2,5)$ using **gap**:
@@ -108,7 +108,7 @@ w.get_letters()        # list of ints
 Apply Knuth-Bendix rewrite rules to relators:
 
 ```bash
-python3 experiments/rewrite_experiment.py \
+uv run python experiments/rewrite_experiment.py \
   data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
   data/kb_mixer_data/shortlex \
   output/rewritten_relators.json
@@ -126,7 +126,7 @@ Logs output to stdout as JSON. Add `--log-file output/experiment.log` to write t
 Apply greedy power reduction to all relators:
 
 ```bash
-python3 experiments/greedy_reduction_experiment.py \
+uv run python experiments/greedy_reduction_experiment.py \
   data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
   output.json
 ```
@@ -134,7 +134,7 @@ python3 experiments/greedy_reduction_experiment.py \
 Use `--workers N` to run in parallel across N processes:
 
 ```bash
-python3 experiments/greedy_reduction_experiment.py \
+uv run python experiments/greedy_reduction_experiment.py \
   data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
   output.json --workers 4
 ```
@@ -146,14 +146,14 @@ Add `--log-file output/experiment.log` to write logs to file instead of stdout.
 Train a Byte-Pair Encoding tokenizer on all relator words:
 
 ```bash
-python3 experiments/bpe_train_experiment.py \
+uv run python experiments/bpe_train_experiment.py \
   data/b25_nontrivial_relators_update_azsw1h6x_20260129.json
 ```
 
 By default the model is saved to `models/tokenizer/bpe_model.json` with a vocabulary size of 1000. Both can be overridden:
 
 ```bash
-python3 experiments/bpe_train_experiment.py \
+uv run python experiments/bpe_train_experiment.py \
   data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
   --output models/tokenizer/my_model.json \
   --vocab-size 2000
@@ -174,7 +174,7 @@ word = tokenizer.decode(token_ids)
 Detect all word squares (W² = WW) in relators:
 
 ```bash
-python3 experiments/squares_experiment.py \
+uv run python experiments/squares_experiment.py \
   data/b25_nontrivial_relators_update_azsw1h6x_20260129.json \
   output/squares_analysis.json
 ```

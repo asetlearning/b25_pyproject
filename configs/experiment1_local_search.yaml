@@ -1,0 +1,32 @@
+# Created by: Alex Myasnikov
+# Date: May 15, 2026
+#
+# Configuration for experiments/pattern_boost/experiment_local_search.py
+#
+# Sweeps run as Cartesian product over sweep.max_steps × sweep.beam_width × sweep.score_types.
+
+relators_file: experiments/pattern_boost/test_relators_1.json
+output_dir: output/pb_generate_local_search_data
+
+num_samples: 5000
+seed: 42
+max_relator_len: 5
+num_generators: 2
+
+sampling:
+  min_factors: 2
+  max_factors: 10
+  conj_len_max: 4
+  min_expanded_len: 10
+
+local_search:
+  num_conj_samples: 5
+  num_insert_samples: 5
+  conj_max_len: 4
+
+sweep:
+  max_steps: [10]
+  beam_width: [10]
+  score_types: ["hellinger", "hamming", "edit"]   # any subset of: hellinger, hamming, edit
+
+workers: 10

@@ -1,0 +1,72 @@
+# Created by: Alex Myasnikov
+# Date: May 14, 2026
+#
+# Sample PatternBoost workflow config. All fields optional with sensible
+# defaults — see algorithms/pattern_boost/workflow.py for the dataclass schema.
+
+output_dir: output/pattern_boost
+seed: 42
+
+relators:
+  max_relator_len: 5
+  num_generators: 2
+
+challenges:
+  path: experiments/pattern_boost/test_relators_1.json
+
+tokenizer:
+  use_bpe: false   # enable BPE merges on top of structured tokens
+  vocab_size: 512  # only used when use_bpe is true
+
+model:
+  n_layer: 6
+  n_head: 8
+  n_embd: 256
+  n_positions: 512
+
+training:
+  batch_size: 16
+  epochs: 10
+  lr: 5.0e-4
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 100
+
+initial_sampling:
+  n_initial: 50000
+  min_factors: 3
+  max_factors: 10
+  min_expanded_len: 10
+  conj_len_max: 4
+
+generation:
+  n_samples: 5100
+  max_length: 512
+  temperature: 1.0
+  top_k: 50
+  top_p: 0.95
+  batch_size: 16
+
+local_search:
+  beam_width: 10
+  max_steps: 10
+  num_conj_samples: 5
+  num_insert_samples: 5
+  conj_max_len: 4
+  min_factors: 3
+  max_factors: 50
+
+scoring:
+  type: hamming  # hellinger | hamming | edit
+
+workflow:
+  num_iterations: 100
+  top_k: 5000
+  max_pool_size: 5000
+  parallel_workers: 10
+  save_every: 10
+  train_from_scratch: false  # rebuild model with fresh weights each iter
+
+logging:
+  level: info
+  log_file: null  # null -> output_dir/run.jsonl

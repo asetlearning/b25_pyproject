@@ -20,7 +20,7 @@ from algorithms.logger import get_logger, configure_logging, configure_logging_q
     JsonFormatter
 from algorithms.word_conversion import freely_reduce, cyclically_reduce
 from data.relators_io import load_relators, convert_to_strings, convert_to_integers
-from algorithms.word_problem import greedy_reduce2_5, greedy_reduce_cyclic_exhaustive2_5
+from algorithms.word_problem import greedy_reduce2_5, greedy_reduce_cyclic_exhaustive2_5, word_from_str
 
 logger = get_logger(__name__)
 
@@ -225,6 +225,7 @@ def main():
 
 if __name__ == "__main__":
     # from algorithms.word_problem import greedy_reduce_cyclic_exhaustive2_5
-    # reduced_word = greedy_reduce_cyclic_exhaustive2_5("bAAAAAAAAAb")
+    # print(word_from_str("ABABabAbaBaBAbabaaBABabAbaBaBAbabaBABabAbABaBAbabaBABabAbaBaBAbabABABabAbABaBAbabaaBABabAbABaBAbabAABABabAbaBaBAbabaBABabAbABaBAbabABABabAbaBaBAbabABABabAbABaBAbabA"))
+    # reduced_word = greedy_reduce_cyclic_exhaustive2_5("ABABabAbaBaBAbabaaBABabAbaBaBAbabaBABabAbABaBAbabaBABabAbaBaBAbabABABabAbABaBAbabaaBABabAbABaBAbabAABABabAbaBaBAbabaBABabAbABaBAbabABABabAbaBaBAbabABABabAbABaBAbabA", [0, 0.5])
     # print(reduced_word)
     main()
