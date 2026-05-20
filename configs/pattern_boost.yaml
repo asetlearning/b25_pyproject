@@ -5,22 +5,24 @@
 # defaults — see algorithms/pattern_boost/workflow.py for the dataclass schema.
 
 output_dir: output/pattern_boost
-seed: 42
+seed: 12345
 
 relators:
   max_relator_len: 5
   num_generators: 2
 
 challenges:
-  path: experiments/pattern_boost/test_relators_1.json
+#  path:  data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced_1.json
+  path: data/pattern_boost_experiments/relator_sets/relators_sample_n1000_20260519_131825.json
+  sample_size: 1
 
 tokenizer:
   use_bpe: false   # enable BPE merges on top of structured tokens
   vocab_size: 512  # only used when use_bpe is true
 
 model:
-  n_layer: 6
-  n_head: 8
+  n_layer: 4
+  n_head: 4
   n_embd: 256
   n_positions: 512
 
@@ -48,13 +50,13 @@ generation:
   batch_size: 16
 
 local_search:
-  beam_width: 10
-  max_steps: 10
+  beam_width: 10 # 1
+  max_steps: 10 # 3
   num_conj_samples: 5
   num_insert_samples: 5
   conj_max_len: 4
   min_factors: 3
-  max_factors: 50
+  max_factors: 10
 
 scoring:
   type: hamming  # hellinger | hamming | edit
