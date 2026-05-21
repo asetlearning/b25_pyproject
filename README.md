@@ -191,6 +191,28 @@ This analyzes each relator to find all subwords that are squares (concatenation 
 - Statistics: total squares, relators with/without squares, square length distribution
 - Detailed logging of each square detected
 
+### PatternBoost Workflow
+
+LM-guided local search for B(2,5): a GPT2 model is trained on FactoredWord sequences, sampled candidates are improved with beam-search local search, and the top-scored survivors (by bigram similarity to challenge words) are fed back into the next training round. Optional cyclic-match stopping criterion writes hits to `run.matches.jsonl`.
+
+All three entry points take a positional YAML config:
+
+```bash
+# Full workflow loop
+uv run python -m experiments.pattern_boost.pattern_boost_main \
+  configs/pattern_boost.yaml [--output-dir PATH] [--init-model-from PATH]
+
+# Train on a fixed FactoredWord pool, sample, score
+uv run python -m experiments.pattern_boost.train_from_factor_words \
+  configs/train_from_factor_words.yaml
+
+# Local-search sweep over (max_steps × beam_width × score_types)
+uv run python -m experiments.pattern_boost.experiment_local_search \
+  configs/experiment1_local_search.yaml
+```
+
+See [`experiments/pattern_boost/README.md`](experiments/pattern_boost/README.md) for the full config schema and output layout (`run.jsonl`, `run.matches.jsonl`, `iter_NNNN/model/`).
+
 ### Structured Logging API
 
 All logs output as JSON with custom fields:

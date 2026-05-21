@@ -62,7 +62,7 @@ scoring:
   type: hamming  # hellinger | hamming | edit
 
 workflow:
-  num_iterations: 100
+  num_iterations: 10
   top_k: 5000
   max_pool_size: 5000
   parallel_workers: 10

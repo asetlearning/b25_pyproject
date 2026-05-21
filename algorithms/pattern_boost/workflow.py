@@ -55,6 +55,18 @@ from algorithms.pattern_boost.tokenizer import FactoredWordTokenizer
 _pb = _ext.pattern_boost
 
 
+# ---------- run result ----------
+
+@dataclass
+class RunSummary:
+    matched: bool = False
+    match_iteration: Optional[int] = None
+    match_challenge: Optional[str] = None
+    total_iterations: int = 0
+    best_score: float = 0.0
+    final_score_stats: dict = field(default_factory=dict)
+
+
 # ---------- config schema ----------
 
 @dataclass
@@ -67,6 +79,7 @@ class RelatorsCfg:
 class ChallengesCfg:
     path: str = ''
     sample_size: Optional[int] = None  # if set, load a random subset of this many
+    names_filter: Optional[list] = None  # if set, load only challenges with these names (overrides sample_size)
 
 
 @dataclass
@@ -251,7 +264,7 @@ def check_stopping_criteria(
     scorer_type: str = '',
     perfect_score: float = 1.0,
     tol: float = 1e-6,
-) -> bool:
+) -> tuple[bool, Optional[str]]:
     """Apply per-iteration stopping criteria after local search.
 
     Criteria:
@@ -260,9 +273,10 @@ def check_stopping_criteria(
       2. Log any candidate whose expanded B(2,5) word is cyclically equal to
          any challenge string. **Terminates** the iteration loop.
 
-    Returns True iff the iteration loop should stop early.
+    Returns (should_stop, first_matched_challenge_name).
     """
     terminate = False
+    first_match: Optional[str] = None
 
     for score, fw in results:
         if abs(float(score) - perfect_score) < tol:
@@ -304,6 +318,8 @@ def check_stopping_criteria(
                     }
                     with Path(matches_path).open('a') as mf:
                         mf.write(json.dumps(record) + '\n')
+                if first_match is None:
+                    first_match = name
                 terminate = True
 
     if cand_lengths:
@@ -330,12 +346,12 @@ def check_stopping_criteria(
         log_structured(logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
                        iteration=iteration, **red_length_stats)
 
-    return terminate
+    return terminate, first_match
 
 
 # ---------- main loop ----------
 
-def run_pattern_boost(cfg: WorkflowConfig) -> None:
+def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     out_dir = Path(cfg.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -358,6 +374,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
         cfg.challenges.path,
         sample_size=cfg.challenges.sample_size,
         seed=cfg.seed,
+        names_filter=cfg.challenges.names_filter,
     )
     log_structured(logger, 'info', event='pb_challenges_loaded',
                    count=len(challenge_words), available=total_in_file,
@@ -381,10 +398,15 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
         log_structured(logger, 'info', event='pb_initial_pool_truncated',
                        kept=len(pool), cap=cfg.workflow.max_pool_size)
 
-        if check_stopping_criteria(scored, rm, challenge_strs, logger, 0):
+        stop, match_name = check_stopping_criteria(scored, rm, challenge_strs, logger, 0)
+        if stop:
             log_structured(logger, 'info', event='pb_stopped_early',
                            iteration=0, reason='challenge_match')
-            return
+            return RunSummary(
+                matched=True, match_iteration=0, match_challenge=match_name,
+                total_iterations=0,
+                best_score=float(scored[0][0]) if scored else 0.0,
+            )
 
 
     tokenizer = FactoredWordTokenizer(num_generators=cfg.relators.num_generators, num_relators=len(rm))
@@ -414,6 +436,9 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
                        device=str(device), vocab_size=tokenizer.vocab_size)
 
     log_structured(logger, 'info', event='pb_initial_scores', **_score_summary(initial_scores))
+
+    summary = RunSummary()
+    last_post_scores: list[float] = []
 
     for it in range(cfg.workflow.num_iterations):
         log_structured(logger, 'info', event='pb_iter_start', iteration=it)
@@ -458,6 +483,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
 
         results.sort(key=lambda x: -x[0])
         post_scores = [s for s, _ in results]
+        last_post_scores = post_scores
         log_structured(logger, 'info', event='pb_search_scores',
                        iteration=it, **_score_summary(post_scores))
 
@@ -471,8 +497,16 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
             log_structured(logger, 'info', event='pb_top_3_candidates',
                            iteration=it, candidates=top_3_words)
 
-        if check_stopping_criteria(results, rm, challenge_strs, logger, it,
-                                   matches_path=matches_path, scorer_type=cfg.scoring.type):
+        stop, match_name = check_stopping_criteria(results, rm, challenge_strs, logger, it,
+                                                   matches_path=matches_path,
+                                                   scorer_type=cfg.scoring.type)
+        if stop:
+            summary.matched = True
+            summary.match_iteration = it
+            summary.match_challenge = match_name
+            summary.total_iterations = it + 1
+            summary.best_score = float(post_scores[0]) if post_scores else 0.0
+            summary.final_score_stats = _score_summary(post_scores) if post_scores else {}
             log_structured(logger, 'info', event='pb_stopped_early',
                            iteration=it, reason='challenge_match')
             break
@@ -496,6 +530,13 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
             log_structured(logger, 'info', event='pb_iter_saved',
                            iteration=it, path=str(iter_dir))
 
+    if not summary.matched and last_post_scores:
+        summary.total_iterations = cfg.workflow.num_iterations
+        summary.best_score = float(last_post_scores[0])
+        summary.final_score_stats = _score_summary(last_post_scores)
+
     log_structured(logger, 'info', event='pb_done',
-                   total_iterations=cfg.workflow.num_iterations,
+                   total_iterations=summary.total_iterations,
                    final_pool_size=len(pool))
+    _release_model(model)
+    return summary
