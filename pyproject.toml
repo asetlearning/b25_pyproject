@@ -22,6 +22,7 @@ build = ["scikit-build-core>=0.10", "pybind11>=2.13", "cmake", "ninja"]
 
 [tool.scikit-build]
 cmake.build-type = "Release"
+build-dir = ".cmake_build/{wheel_tag}"
 wheel.packages = ["algorithms", "data", "experiments", "ml"]
 
 [tool.pytest.ini_options]

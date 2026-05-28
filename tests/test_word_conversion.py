@@ -7,6 +7,7 @@ Date: February 10, 2026
 
 import pytest
 import random
+from tcgraph_ext import Word
 
 from algorithms.word_conversion import (
     int_to_char,
@@ -202,3 +203,7 @@ def test_word_power_fractional_fp_noise():
     word = "a" * sub_len
     result = word_power(word, p)
     assert len(result) == 22942
+
+def test_abelianization():
+    assert Word("abAB").count_powers() == {1: 0, 2: 0}
+    assert Word("abAb").count_powers() == {1: 0, 2: 2}

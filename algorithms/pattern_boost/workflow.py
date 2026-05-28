@@ -252,6 +252,15 @@ def _release_model(model) -> None:
         torch.mps.empty_cache()
 
 
+def _is_trivial_abelianization(word: _ext.Word) -> bool:
+    """Check if a word is trivial in its abelianization.
+
+    A word is trivial in its abelianization if all its powers are trivial.
+    """
+    return all(power % 5 == 0 for power in word.count_powers().values())
+
+
+
 # ---------- stopping criteria ----------
 
 def check_stopping_criteria(
@@ -288,9 +297,18 @@ def check_stopping_criteria(
     cand_lengths = []
     cand_red_lengths = []
     for score, fw in results:
-        cand_str = word_to_str(rm.expand(fw.factors))
+        expanded_word = rm.expand(fw.factors)
+        cand_str = word_to_str(expanded_word)
         if not cand_str:
             continue
+
+        if not _is_trivial_abelianization(expanded_word):
+            log_structured(logger, 'error', event='pb_non_trivial_expansion',
+                           iteration=iteration,
+                           word=cand_str,
+                           )
+            continue
+
 
         cand_red = greedy_reduce2_5(cand_str)
         cand_lengths.append(len(cand_str))

@@ -30,6 +30,7 @@ The C++ extension requires cmake and a C++20 compiler:
 ```bash
 # Ubuntu/Debian
 sudo apt-get install cmake g++ ninja-build
+sudo apt-get install python3.12-dev
 
 # macOS
 brew install cmake ninja
