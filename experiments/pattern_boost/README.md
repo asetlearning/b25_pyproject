@@ -140,19 +140,86 @@ results = [searcher.search(fw, seed=42 + i) for i, fw in enumerate(samples)]
 
 ## Experiments
 
-### `experiment1_local_search.py`
+### `experiment_local_search.py`
 
-**Goal:** Verify that local search improves scores, and check whether any generated word happens to match a known shortlex relator.
-
-**Setup:**
-- **RelatorMap** — 68 shortlex relators from `reduced_rules.json`
-- **Challenge words** — same relators (bigram distributions as targets)
-- **Samples** — 20 random trivial words (`min_factors=2`, `max_factors=6`)
-- **Local search** — greedy, 50 steps
+**Goal:** Sweep over local-search settings and scorer types; save scored FactoredWords for downstream training.
 
 **Run:**
 ```bash
-uv run python experiments/pattern_boost/experiment_local_search.py
+uv run python -m experiments.pattern_boost.experiment_local_search \
+  configs/experiment1_local_search.yaml
 ```
 
-**Output:** per-sample before/after score table, aggregate stats, exact-match check, top-3 results.
+Cartesian product over `sweep.max_steps × sweep.beam_width × sweep.score_types`. Results written as `pb.to_json`-format JSON + sibling `.scores.json`.
+
+---
+
+## Entry-point scripts
+
+All three scripts take a single positional YAML config (no `--config` flag).
+
+### `pattern_boost_main.py` — full workflow loop
+```bash
+uv run python -m experiments.pattern_boost.pattern_boost_main \
+  configs/pattern_boost.yaml \
+  [--output-dir PATH] \
+  [--init-model-from PATH]
+```
+- `--output-dir` overrides `output_dir`; a timestamped `run_YYYYMMDD_HHMMSS` subdir is always appended.
+- `--init-model-from PATH` overrides `init_model_from` (vocab-size validated against the tokenizer at load).
+
+### `train_from_factor_words.py` — Phase 1 supplementary
+Tokenize + train + sample FactoredWords from a fixed input pool.
+```bash
+uv run python -m experiments.pattern_boost.train_from_factor_words \
+  configs/train_from_factor_words.yaml
+```
+Outputs in `output_dir/`:
+- `sampled_factors.json` — `pb.to_json` format (consumable by experiments downstream)
+- `sampled_word_score.jsonl` — one line per sampled word: `{word, length, score}`
+
+### `experiment_local_search.py` — sweep
+See above.
+
+---
+
+## YAML configuration
+
+Schema mirrors the dataclasses in `algorithms/pattern_boost/workflow.py` — `WorkflowConfig` and the nested
+`RelatorsCfg`, `ChallengesCfg`, `TokenizerCfg`, `ModelConfig`, `TrainConfig`, `InitialSamplingCfg`,
+`GenerationCfg`, `LocalSearchCfg`, `ScoringCfg`, `WorkflowLoopCfg`, `LoggingCfg`.
+
+Top-level fields: `output_dir`, `seed`, `init_model_from` (optional path to a saved HF checkpoint).
+
+Recently-added knobs worth knowing:
+
+| Field | Effect |
+|---|---|
+| `challenges.sample_size` | Random subset of challenges; seeded by `cfg.seed`. Omit/null = load all. |
+| `tokenizer.use_bpe` (default `false`) + `vocab_size` | BPE merges on top of structured FactoredWord tokens. |
+| `workflow.train_from_scratch` | Rebuild model with fresh weights each iteration (uses `_release_model` to free GPU/MPS memory). |
+| `workflow.max_pool_size` | Initial pool truncated by score (highest kept). |
+| `scoring.type` | `hellinger | hamming | edit`. |
+| `init_model_from` | Warm-start LM from a previous run's checkpoint dir (e.g. `.../iter_0009/model`). |
+
+Provided configs in `configs/`:
+- `pattern_boost.yaml` — full workflow
+- `pattern_boost_smoke.yaml` — 2-iteration smoke test
+- `train_from_factor_words.yaml`
+- `experiment1_local_search.yaml`
+- `bpe_train.yaml`
+- `generate_sample.yaml`
+
+---
+
+## Outputs
+
+Under `<output_dir>/run_<timestamp>/`:
+
+- `run.jsonl` — JSON event log. Notable events:
+  - `pb_challenges_loaded` (`count` / `available` / `requested`)
+  - `pb_model_built` or `pb_model_loaded_from_ckpt`
+  - `pb_train_seq_lengths` (min/max/mean/p50/p90/p95/p99, `over_max_len_pct`)
+  - `pb_challenge_match`, `pb_perfect_score_candidate`
+- `run.matches.jsonl` — one JSON record per cyclic challenge match (filename stem matches the log file). Fields: `iteration`, `timestamp`, `challenge_name`, `challenge_word`, `candidate_word`, `factor_word`, `score`, `scorer_type`.
+- `iter_NNNN/model/` — HuggingFace checkpoint per saved iteration (controlled by `workflow.save_every`). Reload via `--init-model-from <path>`.

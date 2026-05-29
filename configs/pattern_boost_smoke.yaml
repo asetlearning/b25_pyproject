@@ -11,7 +11,7 @@ relators:
   num_generators: 2
 
 challenges:
-  path: experiments/pattern_boost/test_relators_1.json
+  path: /media/psf/b25_pyproject/data/pattern_boost_experiments/relator_sets/relators_sample_n1_20260519_131705.json
 
 tokenizer:
   use_bpe: false

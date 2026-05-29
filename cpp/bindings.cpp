@@ -55,6 +55,7 @@ PYBIND11_MODULE(tcgraph_ext, m) {
         .def("power", &Word::power, py::arg("p"))
         .def("to_string", &Word::toString)
         .def("to_gap_string", &Word::toGapString, py::arg("x"))
+        .def("count_powers", &Word::countPowers)
         .def("__len__", &Word::size)
         .def("__getitem__", &Word::operator[])
         .def("__mul__", &Word::operator*)

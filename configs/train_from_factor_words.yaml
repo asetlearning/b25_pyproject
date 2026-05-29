@@ -36,7 +36,7 @@ sampling:
   top_p: 0.95
 
 scoring:
-  challenges: experiments/pattern_boost/test_relators_1.json       # optional relators_io-style JSON; when set, sampled.jsonl gets a "score" field
+  challenges: experiments/pattern_boost/relators_shortlex_rules_2.5reduced_1.json       # optional relators_io-style JSON; when set, sampled.jsonl gets a "score" field
   type: edit        # hellinger | hamming | edit
 
 logging:

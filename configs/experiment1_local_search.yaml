@@ -5,7 +5,7 @@
 #
 # Sweeps run as Cartesian product over sweep.max_steps × sweep.beam_width × sweep.score_types.
 
-relators_file: experiments/pattern_boost/test_relators_1.json
+relators_file: experiments/pattern_boost/relators_shortlex_rules_2.5reduced_1.json
 output_dir: output/pb_generate_local_search_data
 
 num_samples: 5000

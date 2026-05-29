@@ -16,6 +16,7 @@ import logging
 import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -54,6 +55,18 @@ from algorithms.pattern_boost.tokenizer import FactoredWordTokenizer
 _pb = _ext.pattern_boost
 
 
+# ---------- run result ----------
+
+@dataclass
+class RunSummary:
+    matched: bool = False
+    match_iteration: Optional[int] = None
+    match_challenge: Optional[str] = None
+    total_iterations: int = 0
+    best_score: float = 0.0
+    final_score_stats: dict = field(default_factory=dict)
+
+
 # ---------- config schema ----------
 
 @dataclass
@@ -65,6 +78,8 @@ class RelatorsCfg:
 @dataclass
 class ChallengesCfg:
     path: str = ''
+    sample_size: Optional[int] = None  # if set, load a random subset of this many
+    names_filter: Optional[list] = None  # if set, load only challenges with these names (overrides sample_size)
 
 
 @dataclass
@@ -128,6 +143,7 @@ class LoggingCfg:
 class WorkflowConfig:
     output_dir: str = 'output/pattern_boost'
     seed: int = 42
+    init_model_from: Optional[str] = None  # path to saved model checkpoint dir
     relators: RelatorsCfg = field(default_factory=RelatorsCfg)
     challenges: ChallengesCfg = field(default_factory=ChallengesCfg)
     tokenizer: TokenizerCfg = field(default_factory=TokenizerCfg)
@@ -236,6 +252,15 @@ def _release_model(model) -> None:
         torch.mps.empty_cache()
 
 
+def _is_trivial_abelianization(word: _ext.Word) -> bool:
+    """Check if a word is trivial in its abelianization.
+
+    A word is trivial in its abelianization if all its powers are trivial.
+    """
+    return all(power % 5 == 0 for power in word.count_powers().values())
+
+
+
 # ---------- stopping criteria ----------
 
 def check_stopping_criteria(
@@ -244,9 +269,11 @@ def check_stopping_criteria(
     challenge_strs: dict,
     logger,
     iteration: int,
+    matches_path: Optional[Path] = None,
+    scorer_type: str = '',
     perfect_score: float = 1.0,
     tol: float = 1e-6,
-) -> bool:
+) -> tuple[bool, Optional[str]]:
     """Apply per-iteration stopping criteria after local search.
 
     Criteria:
@@ -255,9 +282,10 @@ def check_stopping_criteria(
       2. Log any candidate whose expanded B(2,5) word is cyclically equal to
          any challenge string. **Terminates** the iteration loop.
 
-    Returns True iff the iteration loop should stop early.
+    Returns (should_stop, first_matched_challenge_name).
     """
     terminate = False
+    first_match: Optional[str] = None
 
     for score, fw in results:
         if abs(float(score) - perfect_score) < tol:
@@ -269,9 +297,18 @@ def check_stopping_criteria(
     cand_lengths = []
     cand_red_lengths = []
     for score, fw in results:
-        cand_str = word_to_str(rm.expand(fw.factors))
+        expanded_word = rm.expand(fw.factors)
+        cand_str = word_to_str(expanded_word)
         if not cand_str:
             continue
+
+        if not _is_trivial_abelianization(expanded_word):
+            log_structured(logger, 'error', event='pb_non_trivial_expansion',
+                           iteration=iteration,
+                           word=cand_str,
+                           )
+            continue
+
 
         cand_red = greedy_reduce2_5(cand_str)
         cand_lengths.append(len(cand_str))
@@ -286,6 +323,21 @@ def check_stopping_criteria(
                                challenge=chal_str,
                                candidate=cand_str,
                                score=float(score))
+                if matches_path is not None:
+                    record = {
+                        'iteration': iteration,
+                        'timestamp': datetime.now().isoformat(),
+                        'challenge_name': name,
+                        'challenge_word': chal_str,
+                        'candidate_word': cand_str,
+                        'factor_word': json.loads(to_json(fw, rm)),
+                        'score': float(score),
+                        'scorer_type': scorer_type,
+                    }
+                    with Path(matches_path).open('a') as mf:
+                        mf.write(json.dumps(record) + '\n')
+                if first_match is None:
+                    first_match = name
                 terminate = True
 
     if cand_lengths:
@@ -312,19 +364,21 @@ def check_stopping_criteria(
         log_structured(logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
                        iteration=iteration, **red_length_stats)
 
-    return terminate
+    return terminate, first_match
 
 
 # ---------- main loop ----------
 
-def run_pattern_boost(cfg: WorkflowConfig) -> None:
+def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     out_dir = Path(cfg.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     log_file = cfg.logging.log_file or str(out_dir / 'run.jsonl')
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     configure_logging(log_file=log_file, level=cfg.logging.level)
     logger = logging.getLogger('pattern_boost.workflow')
+    matches_path = log_path.parent / f'{log_path.stem}.matches.jsonl'
 
     log_structured(logger, 'info', event='pb_start', config=asdict(cfg))
 
@@ -333,9 +387,18 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
 
     if not cfg.challenges.path:
         raise ValueError('challenges.path must be set in config')
-    challenge_words, challenge_strs = load_challenges(cfg.challenges.path)
+    total_in_file = len(json.loads(Path(cfg.challenges.path).read_text()))
+    challenge_words, challenge_strs = load_challenges(
+        cfg.challenges.path,
+        sample_size=cfg.challenges.sample_size,
+        seed=cfg.seed,
+        names_filter=cfg.challenges.names_filter,
+    )
     log_structured(logger, 'info', event='pb_challenges_loaded',
-                   count=len(challenge_words), path=cfg.challenges.path)
+                   count=len(challenge_words), available=total_in_file,
+                   requested=cfg.challenges.sample_size,
+                   path=cfg.challenges.path,
+                   challenge_names=list(challenge_strs.keys()))
 
     scorer = make_scorer(cfg.scoring.type, challenge_words, cfg.relators.num_generators)
     ls_cfg = _make_local_search_cfg(cfg.local_search, cfg.relators.num_generators)
@@ -353,10 +416,15 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
         log_structured(logger, 'info', event='pb_initial_pool_truncated',
                        kept=len(pool), cap=cfg.workflow.max_pool_size)
 
-        if check_stopping_criteria(scored, rm, challenge_strs, logger, 0):
+        stop, match_name = check_stopping_criteria(scored, rm, challenge_strs, logger, 0)
+        if stop:
             log_structured(logger, 'info', event='pb_stopped_early',
                            iteration=0, reason='challenge_match')
-            return
+            return RunSummary(
+                matched=True, match_iteration=0, match_challenge=match_name,
+                total_iterations=0,
+                best_score=float(scored[0][0]) if scored else 0.0,
+            )
 
 
     tokenizer = FactoredWordTokenizer(num_generators=cfg.relators.num_generators, num_relators=len(rm))
@@ -368,12 +436,27 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
                    vocab_size=tokenizer.vocab_size,
                    base_size=len(tokenizer.base_tokens))
 
-    model = build_model(tokenizer, cfg.model)
     device = pick_device()
-    log_structured(logger, 'info', event='pb_model_built',
-                   device=str(device), vocab_size=tokenizer.vocab_size)
+    if cfg.init_model_from:
+        model = load_checkpoint(cfg.init_model_from)
+        if model.config.vocab_size != tokenizer.vocab_size:
+            raise ValueError(
+                f'checkpoint vocab_size={model.config.vocab_size} does not match '
+                f'tokenizer vocab_size={tokenizer.vocab_size} '
+                f'(loaded from {cfg.init_model_from})'
+            )
+        log_structured(logger, 'info', event='pb_model_loaded_from_ckpt',
+                       device=str(device), vocab_size=tokenizer.vocab_size,
+                       path=cfg.init_model_from)
+    else:
+        model = build_model(tokenizer, cfg.model)
+        log_structured(logger, 'info', event='pb_model_built',
+                       device=str(device), vocab_size=tokenizer.vocab_size)
 
     log_structured(logger, 'info', event='pb_initial_scores', **_score_summary(initial_scores))
+
+    summary = RunSummary()
+    last_post_scores: list[float] = []
 
     for it in range(cfg.workflow.num_iterations):
         log_structured(logger, 'info', event='pb_iter_start', iteration=it)
@@ -418,6 +501,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
 
         results.sort(key=lambda x: -x[0])
         post_scores = [s for s, _ in results]
+        last_post_scores = post_scores
         log_structured(logger, 'info', event='pb_search_scores',
                        iteration=it, **_score_summary(post_scores))
 
@@ -431,7 +515,16 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
             log_structured(logger, 'info', event='pb_top_3_candidates',
                            iteration=it, candidates=top_3_words)
 
-        if check_stopping_criteria(results, rm, challenge_strs, logger, it):
+        stop, match_name = check_stopping_criteria(results, rm, challenge_strs, logger, it,
+                                                   matches_path=matches_path,
+                                                   scorer_type=cfg.scoring.type)
+        if stop:
+            summary.matched = True
+            summary.match_iteration = it
+            summary.match_challenge = match_name
+            summary.total_iterations = it + 1
+            summary.best_score = float(post_scores[0]) if post_scores else 0.0
+            summary.final_score_stats = _score_summary(post_scores) if post_scores else {}
             log_structured(logger, 'info', event='pb_stopped_early',
                            iteration=it, reason='challenge_match')
             break
@@ -455,6 +548,13 @@ def run_pattern_boost(cfg: WorkflowConfig) -> None:
             log_structured(logger, 'info', event='pb_iter_saved',
                            iteration=it, path=str(iter_dir))
 
+    if not summary.matched and last_post_scores:
+        summary.total_iterations = cfg.workflow.num_iterations
+        summary.best_score = float(last_post_scores[0])
+        summary.final_score_stats = _score_summary(last_post_scores)
+
     log_structured(logger, 'info', event='pb_done',
-                   total_iterations=cfg.workflow.num_iterations,
+                   total_iterations=summary.total_iterations,
                    final_pool_size=len(pool))
+    _release_model(model)
+    return summary

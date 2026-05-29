@@ -4,7 +4,9 @@
 """Shared helpers for PatternBoost experiment scripts and the workflow loop."""
 
 import json
+import random
 from pathlib import Path
+from typing import Optional
 
 import tcgraph_ext as _ext
 
@@ -32,17 +34,33 @@ def make_scorer(score_type: str, challenges, num_generators: int):
     raise ValueError(f'unknown scorer type: {score_type}')
 
 
-def load_challenges(path) -> tuple[list, dict[str, str]]:
+def load_challenges(
+    path,
+    sample_size: Optional[int] = None,
+    seed: Optional[int] = None,
+    names_filter: Optional[list] = None,
+) -> tuple[list, dict[str, str]]:
     """Load challenges from relators_io-style JSON.
 
     Accepts both string ("ABaB...") and int-array ([-1,-2,...]) "word" fields.
     Returns (challenge Words list, name -> word_str mapping). Callers needing
     only the Word list can take `load_challenges(path)[0]`.
+
+    Priority: names_filter > sample_size. If `names_filter` is given, only
+    challenges whose name appears in that list are loaded (order preserved).
+    Otherwise, if `sample_size` is given and smaller than total, a seeded
+    random subset is returned.
     """
     data = json.loads(Path(path).read_text())
+    items = list(data.items())
+    if names_filter is not None:
+        allowed = set(names_filter)
+        items = [(n, e) for n, e in items if n in allowed]
+    elif sample_size is not None and sample_size < len(items):
+        items = random.Random(seed).sample(items, sample_size)
     words: list = []
     name_to_str: dict[str, str] = {}
-    for name, entry in data.items():
+    for name, entry in items:
         w = entry['word']
         if isinstance(w, str):
             words.append(word_from_str(w))

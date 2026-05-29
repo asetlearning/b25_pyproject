@@ -1,0 +1,25 @@
+# Created by: Alex Myasnikov
+# Date: May 20, 2026
+#
+# PatternBoost sweep config: 2×2 params × 3 trials = 12 runs total.
+# base_config.challenges.sample_size controls how many challenges each trial uses.
+# With num_trials > 1, challenges are pre-shuffled and partitioned into
+# non-overlapping windows — no challenge appears in two trials of the same combo.
+
+base_config: configs/pattern_boost.yaml
+output_dir: output/pb_sweep
+seed: 42
+num_trials: 3  # runs per param combo; each uses a non-overlapping challenge sample
+
+# Cartesian product of all lists below — one combo per combination.
+# Keys are dot-notation paths into WorkflowConfig (see workflow.py).
+params:
+  scoring.type: [hellinger, hamming]
+  local_search.beam_width: [1, 5]
+  workflow.max_pool_size: [100, 500]
+
+# Derived params: Python expressions evaluated after params are applied.
+# Config sub-objects (workflow, generation, local_search, ...) are in scope.
+derived:
+  workflow.top_k: "workflow.max_pool_size"
+  generation.n_samples: "int(workflow.max_pool_size * 1.1)"

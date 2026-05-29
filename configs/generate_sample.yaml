@@ -1,0 +1,21 @@
+# Created by: Alex Myasnikov
+# Date: May 15, 2026
+#
+# Configuration for experiments/pattern_boost/experiment_local_search.py
+#
+# Sample generation part only
+
+output_dir: output/pb_generate_sample
+
+num_samples: 1000
+seed: 42
+max_relator_len: 5
+num_generators: 2
+
+sampling:
+  min_factors: 3
+  max_factors: 10
+  conj_len_max: 4
+  min_expanded_len: 10
+
+workers: 10
