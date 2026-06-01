@@ -9,10 +9,10 @@ import faulthandler
 
 faulthandler.enable()
 
-from ml.bpe import BPETokenizerWords
+from algorithms.word_compression import BPETokenizerWordCompression
 from algorithms.logger import get_logger
 from data.relators_io import load_relators, convert_to_strings
-from algorithms.word_problem import Word, attempt_to_reduce_using_relations_greedy
+from algorithms.word_problem import attempt_to_reduce_using_relations_greedy
 
 logger = get_logger(__name__)
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # tokenizer = BPETokenizerWords.from_file("../b25_pyproject/models/tokenizer/bpe_tokenizer_b25_nontrivial_relators_update_azsw1h6x_20260129.json")
     # relators = convert_to_strings(load_relators("../b25_pyproject/data/reduce_words_power_2.5/reduced_relators_20260305.json"))
-    tokenizer = BPETokenizerWords.from_file(args.tokenizer)
+    tokenizer = BPETokenizerWordCompression.from_file(args.tokenizer)
     relators = convert_to_strings(load_relators(args.relators_file))
 
     rel_to_reduce = relators["R5"]["word"]

@@ -3,7 +3,7 @@
 #
 # Configuration for experiments/bpe_train_experiment.py
 
-relators_file: data/b25_nontrivial_relators_update_azsw1h6x_20260129.json
-output: models/tokenizer/bpe_model.json
-vocab_size: 1000
+relators_file: data/pattern_boost_experiments/relator_sets/relators_sample_n1000_20260519_131825.json
+output: models/tokenizer/compression_bpe_sample_n1000_20260519_131825.json
+vocab_size: 100
 alphabet: ['a', 'b', 'A', 'B']

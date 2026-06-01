@@ -163,9 +163,9 @@ uv run python experiments/bpe_train_experiment.py \
 The saved model can be loaded back with `BPETokenizerWords.from_file(path)`:
 
 ```python
-from ml.bpe import BPETokenizerWords
+from algorithms.word_compression import BPETokenizerWordCompression
 
-tokenizer = BPETokenizerWords.from_file("models/tokenizer/bpe_model.json")
+tokenizer = BPETokenizerWordCompression.from_file("models/tokenizer/bpe_model.json")
 token_ids = tokenizer.encode("abABabAB")
 word = tokenizer.decode(token_ids)
 ```
