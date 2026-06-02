@@ -67,6 +67,16 @@ class RunSummary:
     final_score_stats: dict = field(default_factory=dict)
 
 
+@dataclass
+class _RunCtx:
+    rm: RelatorMap
+    challenge_strs: dict
+    logger: logging.Logger
+    scorer_type: str
+    matches_path: Optional[Path] = None
+    compressor: Optional[object] = None
+
+
 # ---------- config schema ----------
 
 @dataclass
@@ -271,16 +281,11 @@ def _is_trivial_abelianization(word: _ext.Word) -> bool:
 # ---------- stopping criteria ----------
 
 def check_stopping_criteria(
+    ctx: _RunCtx,
     results: list,
-    rm: RelatorMap,
-    challenge_strs: dict,
-    logger,
     iteration: int,
-    matches_path: Optional[Path] = None,
-    scorer_type: str = '',
     perfect_score: float = 1.0,
     tol: float = 1e-6,
-    compressor=None,
 ) -> tuple[bool, Optional[str]]:
     """Apply per-iteration stopping criteria after local search.
 
@@ -297,25 +302,25 @@ def check_stopping_criteria(
 
     for score, fw in results:
         if abs(float(score) - perfect_score) < tol:
-            expanded_word = rm.expand(fw.factors)
-            if compressor:
-                decoded_str = compressor.decode_word(expanded_word)
-                log_structured(logger, 'info', event='pb_perfect_score_candidate',
+            expanded_word = ctx.rm.expand(fw.factors)
+            if ctx.compressor:
+                decoded_str = ctx.compressor.decode_word(expanded_word)
+                log_structured(ctx.logger, 'info', event='pb_perfect_score_candidate',
                                iteration=iteration, score=float(score),
                                word=decoded_str,
-                               compressed_word=compressor.compressed_repr(expanded_word))
+                               compressed_word=ctx.compressor.compressed_repr(expanded_word))
             else:
-                log_structured(logger, 'info', event='pb_perfect_score_candidate',
+                log_structured(ctx.logger, 'info', event='pb_perfect_score_candidate',
                                iteration=iteration, score=float(score),
                                word=word_to_str(expanded_word))
 
     cand_lengths = []
     cand_red_lengths = []
     for score, fw in results:
-        expanded_word = rm.expand(fw.factors)
-        if compressor:
-            cand_str = compressor.decode_word(expanded_word)
-            cand_compressed = compressor.compressed_repr(expanded_word)
+        expanded_word = ctx.rm.expand(fw.factors)
+        if ctx.compressor:
+            cand_str = ctx.compressor.decode_word(expanded_word)
+            cand_compressed = ctx.compressor.compressed_repr(expanded_word)
         else:
             cand_str = word_to_str(expanded_word)
             cand_compressed = None
@@ -323,9 +328,9 @@ def check_stopping_criteria(
         if not cand_str:
             continue
 
-        abelian_check_word = word_from_str(cand_str) if compressor else expanded_word
+        abelian_check_word = word_from_str(cand_str) if ctx.compressor else expanded_word
         if not _is_trivial_abelianization(abelian_check_word):
-            log_structured(logger, 'error', event='pb_non_trivial_expansion',
+            log_structured(ctx.logger, 'error', event='pb_non_trivial_expansion',
                            iteration=iteration,
                            word=cand_str,
                            )
@@ -336,30 +341,30 @@ def check_stopping_criteria(
         cand_red_lengths.append(len(cand_red))
 
         doubled = cand_str + cand_str
-        for name, chal_str in challenge_strs.items():
+        for name, chal_str in ctx.challenge_strs.items():
             if len(cand_str) == len(chal_str) and chal_str in doubled:
                 extra = {'compressed_word': cand_compressed} if cand_compressed is not None else {}
-                log_structured(logger, 'info', event='pb_challenge_match',
+                log_structured(ctx.logger, 'info', event='pb_challenge_match',
                                iteration=iteration,
                                challenge_name=name,
                                challenge=chal_str,
                                candidate=cand_str,
                                score=float(score),
                                **extra)
-                if matches_path is not None:
+                if ctx.matches_path is not None:
                     record = {
                         'iteration': iteration,
                         'timestamp': datetime.now().isoformat(),
                         'challenge_name': name,
                         'challenge_word': chal_str,
                         'candidate_word': cand_str,
-                        'factor_word': json.loads(to_json(fw, rm)),
+                        'factor_word': json.loads(to_json(fw, ctx.rm)),
                         'score': float(score),
-                        'scorer_type': scorer_type,
+                        'scorer_type': ctx.scorer_type,
                     }
                     if cand_compressed is not None:
                         record['compressed_word'] = cand_compressed
-                    with Path(matches_path).open('a') as mf:
+                    with Path(ctx.matches_path).open('a') as mf:
                         mf.write(json.dumps(record) + '\n')
                 if first_match is None:
                     first_match = name
@@ -372,9 +377,9 @@ def check_stopping_criteria(
             'max': max(cand_lengths),
             'mean': statistics.mean(cand_lengths),
             'median': statistics.median(cand_lengths),
-            'avg_goal': statistics.mean([len(chal_str) for chal_str in challenge_strs.values()]),
+            'avg_goal': statistics.mean([len(chal_str) for chal_str in ctx.challenge_strs.values()]),
         }
-        log_structured(logger, 'info', event='pb_candidate_length_stats',
+        log_structured(ctx.logger, 'info', event='pb_candidate_length_stats',
                        iteration=iteration, **length_stats)
 
     if cand_red_lengths:
@@ -384,9 +389,9 @@ def check_stopping_criteria(
             'max': max(cand_red_lengths),
             'mean': statistics.mean(cand_red_lengths),
             'median': statistics.median(cand_red_lengths),
-            'avg_goal': statistics.mean([len(chal_str) for chal_str in challenge_strs.values()]),
+            'avg_goal': statistics.mean([len(chal_str) for chal_str in ctx.challenge_strs.values()]),
         }
-        log_structured(logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
+        log_structured(ctx.logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
                        iteration=iteration, **red_length_stats)
 
     return terminate, first_match
@@ -404,9 +409,8 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     configure_logging(log_file=log_file, level=cfg.logging.level)
     logger = logging.getLogger('pattern_boost.workflow')
-    matches_path = log_path.parent / f'{log_path.stem}.matches.jsonl'
-
     log_structured(logger, 'info', event='pb_start', config=asdict(cfg))
+    matches_path = log_path.parent / f'{log_path.stem}.matches.jsonl'
 
     # ====== PHASE 2: Resolve num_generators (and optionally init compressor) ======
     compressor = None
@@ -445,6 +449,15 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         log_structured(logger, 'info', event='pb_compressed_challenges_loaded',
                        compressed_challenges=[compressor.compressed_repr(w) for w in challenge_words])
 
+    ctx = _RunCtx(
+        rm=rm,
+        challenge_strs=challenge_strs,
+        logger=logger,
+        scorer_type=cfg.scoring.type,
+        matches_path=matches_path,
+        compressor=compressor,
+    )
+
     # ====== PHASE 3: Initialize scorer and local searcher ======
     # TODO: If compressed - scorer will compare compressed strings, however different compressions amy
     # lead to the same word string. Perhpas should score on expanded/decoded words, not tokens.
@@ -468,8 +481,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         log_structured(logger, 'info', event='pb_initial_pool_truncated',
                        kept=len(pool), cap=cfg.workflow.max_pool_size)
 
-        stop, match_name = check_stopping_criteria(scored, rm, challenge_strs, logger, 0,
-                                                   compressor=compressor)
+        stop, match_name = check_stopping_criteria(ctx, scored, 0)
         if stop:
             log_structured(logger, 'info', event='pb_stopped_early',
                            iteration=0, reason='challenge_match')
@@ -584,10 +596,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                            iteration=it, candidates=top_3_words)
 
         # Check stopping criteria
-        stop, match_name = check_stopping_criteria(results, rm, challenge_strs, logger, it,
-                                                   matches_path=matches_path,
-                                                   scorer_type=cfg.scoring.type,
-                                                   compressor=compressor)
+        stop, match_name = check_stopping_criteria(ctx, results, it)
         if stop:
             summary.matched = True
             summary.match_iteration = it
