@@ -64,3 +64,7 @@ workflow:
 
 logging:
   level: info
+
+compression:
+  use_compression: false
+  compression_tokenizer: null  # path to BPETokenizerWordCompression model JSON

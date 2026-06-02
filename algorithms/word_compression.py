@@ -2,7 +2,7 @@ from collections import Counter
 import json
 
 
-class BPETokenizerWords:
+class BPETokenizerWordCompression:
     def __init__(self, alphabet: list[str], eow: str = "#"):
         self.alphabet = alphabet
         self.eow = eow
@@ -207,7 +207,7 @@ class BPETokenizerWords:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     @classmethod
-    def from_file(cls, path: str) -> "BPETokenizerWords":
+    def from_file(cls, path: str) -> "BPETokenizerWordCompression":
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         obj = cls(alphabet=data["alphabet"], eow=data["eow"])
@@ -259,7 +259,7 @@ def main():
     parse_word = "babababab"
 #    parse_word = "aBababaBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbaBABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbAABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbababABABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbaBBABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbAABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbababbabaBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbaBABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbAABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbabaababaBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbaBBABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbaBBABaBAbabABaBBAbabABABaBAbaBABaBBAbabbAABBABaBAbabABaBBAbabaBABaBAbaBABaBBAbabbABaBAbabABaBBAbabABABaBAbaBABaBBAbabbababb"
 
-    tokenizer = BPETokenizerWords(['a','b','A','B'])
+    tokenizer = BPETokenizerWordCompression(['a', 'b', 'A', 'B'])
     word_list = [train_word]
     tokenizer.train(word_list, 1000)
     tokenizer.save("ml/bpe_model.json")
@@ -276,7 +276,7 @@ def main():
 
     print(f"Orig word len: {len(parse_word)}, tokens: {len(tokens)}")
 
-    tokenizer2 = BPETokenizerWords.from_file("ml/bpe_model.json")
+    tokenizer2 = BPETokenizerWordCompression.from_file("ml/bpe_model.json")
     tokens2 = tokenizer2.encode(parse_word)
     words2 = tokenizer2.decode(tokens2)
     if words2 == parse_word:

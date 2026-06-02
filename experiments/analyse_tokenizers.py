@@ -5,12 +5,11 @@ import sys
 # Add the directory to sys.path
 sys.path.append('../b25_pyproject/')
 
-from ml.bpe import BPETokenizerWords
-from algorithms.word_conversion import cyclically_reduce
+from algorithms.word_compression import BPETokenizerWordCompression
 from algorithms.maximal_power import find_maximal_powers
 from algorithms.word_squares import find_squares
 
-tokenizer = BPETokenizerWords.from_file(tokenizer_name)
+tokenizer = BPETokenizerWordCompression.from_file(tokenizer_name)
 
 resuts = []
 for t, v in tokenizer.vocab.items():

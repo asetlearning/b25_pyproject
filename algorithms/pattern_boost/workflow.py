@@ -26,7 +26,7 @@ from tqdm import tqdm
 
 import tcgraph_ext as _ext
 from algorithms.logger import configure_logging, log_structured
-from algorithms.word_problem import word_to_str, greedy_reduce2_5
+from algorithms.word_problem import word_from_str, word_to_str, greedy_reduce2_5
 from algorithms.pattern_boost.common import load_challenges, make_scorer
 from algorithms.pattern_boost.model import (
     ModelConfig,
@@ -67,6 +67,16 @@ class RunSummary:
     final_score_stats: dict = field(default_factory=dict)
 
 
+@dataclass
+class _RunCtx:
+    rm: RelatorMap
+    challenge_strs: dict
+    logger: logging.Logger
+    scorer_type: str
+    matches_path: Optional[Path] = None
+    compressor: Optional[object] = None
+
+
 # ---------- config schema ----------
 
 @dataclass
@@ -79,7 +89,8 @@ class RelatorsCfg:
 class ChallengesCfg:
     path: str = ''
     sample_size: Optional[int] = None  # if set, load a random subset of this many
-    names_filter: Optional[list] = None  # if set, load only challenges with these names (overrides sample_size)
+    names_filter: Optional[
+        list] = None  # if set, load only challenges with these names (overrides sample_size)
 
 
 @dataclass
@@ -140,6 +151,12 @@ class LoggingCfg:
 
 
 @dataclass
+class CompressionCfg:
+    use_compression: bool = False
+    compression_tokenizer: Optional[str] = None  # path to BPETokenizerWordCompression model file
+
+
+@dataclass
 class WorkflowConfig:
     output_dir: str = 'output/pattern_boost'
     seed: int = 42
@@ -155,6 +172,7 @@ class WorkflowConfig:
     scoring: ScoringCfg = field(default_factory=ScoringCfg)
     workflow: WorkflowLoopCfg = field(default_factory=WorkflowLoopCfg)
     logging: LoggingCfg = field(default_factory=LoggingCfg)
+    compression: CompressionCfg = field(default_factory=CompressionCfg)
 
 
 def _build_nested(dc_cls, src):
@@ -260,17 +278,12 @@ def _is_trivial_abelianization(word: _ext.Word) -> bool:
     return all(power % 5 == 0 for power in word.count_powers().values())
 
 
-
 # ---------- stopping criteria ----------
 
 def check_stopping_criteria(
+    ctx: _RunCtx,
     results: list,
-    rm: RelatorMap,
-    challenge_strs: dict,
-    logger,
     iteration: int,
-    matches_path: Optional[Path] = None,
-    scorer_type: str = '',
     perfect_score: float = 1.0,
     tol: float = 1e-6,
 ) -> tuple[bool, Optional[str]]:
@@ -289,52 +302,69 @@ def check_stopping_criteria(
 
     for score, fw in results:
         if abs(float(score) - perfect_score) < tol:
-            expanded_str = word_to_str(rm.expand(fw.factors))
-            log_structured(logger, 'info', event='pb_perfect_score_candidate',
-                           iteration=iteration, score=float(score),
-                           word=expanded_str)
+            expanded_word = ctx.rm.expand(fw.factors)
+            if ctx.compressor:
+                decoded_str = ctx.compressor.decode_word(expanded_word)
+                log_structured(ctx.logger, 'info', event='pb_perfect_score_candidate',
+                               iteration=iteration, score=float(score),
+                               word=decoded_str,
+                               compressed_word=ctx.compressor.compressed_repr(expanded_word))
+            else:
+                log_structured(ctx.logger, 'info', event='pb_perfect_score_candidate',
+                               iteration=iteration, score=float(score),
+                               word=word_to_str(expanded_word))
 
     cand_lengths = []
     cand_red_lengths = []
     for score, fw in results:
-        expanded_word = rm.expand(fw.factors)
-        cand_str = word_to_str(expanded_word)
+        expanded_word = ctx.rm.expand(fw.factors)
+        if ctx.compressor:
+            cand_str = ctx.compressor.decode_word(expanded_word)
+            cand_compressed = ctx.compressor.compressed_repr(expanded_word)
+        else:
+            cand_str = word_to_str(expanded_word)
+            cand_compressed = None
+
         if not cand_str:
             continue
 
-        if not _is_trivial_abelianization(expanded_word):
-            log_structured(logger, 'error', event='pb_non_trivial_expansion',
+        abelian_check_word = word_from_str(cand_str) if ctx.compressor else expanded_word
+        if not _is_trivial_abelianization(abelian_check_word):
+            log_structured(ctx.logger, 'error', event='pb_non_trivial_expansion',
                            iteration=iteration,
                            word=cand_str,
                            )
             continue
-
 
         cand_red = greedy_reduce2_5(cand_str)
         cand_lengths.append(len(cand_str))
         cand_red_lengths.append(len(cand_red))
 
         doubled = cand_str + cand_str
-        for name, chal_str in challenge_strs.items():
+        for name, chal_str in ctx.challenge_strs.items():
             if len(cand_str) == len(chal_str) and chal_str in doubled:
-                log_structured(logger, 'info', event='pb_challenge_match',
+                extra = {'compressed_word': cand_compressed} if cand_compressed is not None else {}
+                log_structured(ctx.logger, 'info', event='pb_challenge_match',
                                iteration=iteration,
                                challenge_name=name,
                                challenge=chal_str,
                                candidate=cand_str,
-                               score=float(score))
-                if matches_path is not None:
+                               score=float(score),
+                               **extra)
+                if ctx.matches_path is not None:
                     record = {
                         'iteration': iteration,
                         'timestamp': datetime.now().isoformat(),
                         'challenge_name': name,
                         'challenge_word': chal_str,
                         'candidate_word': cand_str,
-                        'factor_word': json.loads(to_json(fw, rm)),
+                        'factor_word': json.loads(to_json(fw, ctx.rm)),
                         'score': float(score),
-                        'scorer_type': scorer_type,
+                        'scorer_type': ctx.scorer_type,
                     }
-                    with Path(matches_path).open('a') as mf:
+                    if cand_compressed is not None:
+                        record['compressed_word'] = cand_compressed
+                    with Path(ctx.matches_path).open('a') as mf:
                         mf.write(json.dumps(record) + '\n')
                 if first_match is None:
                     first_match = name
@@ -347,9 +377,9 @@ def check_stopping_criteria(
             'max': max(cand_lengths),
             'mean': statistics.mean(cand_lengths),
             'median': statistics.median(cand_lengths),
-            'avg_goal': statistics.mean([len(chal_str) for chal_str in challenge_strs.values()]),
+            'avg_goal': statistics.mean([len(chal_str) for chal_str in ctx.challenge_strs.values()]),
         }
-        log_structured(logger, 'info', event='pb_candidate_length_stats',
+        log_structured(ctx.logger, 'info', event='pb_candidate_length_stats',
                        iteration=iteration, **length_stats)
 
     if cand_red_lengths:
@@ -359,9 +389,9 @@ def check_stopping_criteria(
             'max': max(cand_red_lengths),
             'mean': statistics.mean(cand_red_lengths),
             'median': statistics.median(cand_red_lengths),
-            'avg_goal': statistics.mean([len(chal_str) for chal_str in challenge_strs.values()]),
+            'avg_goal': statistics.mean([len(chal_str) for chal_str in ctx.challenge_strs.values()]),
         }
-        log_structured(logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
+        log_structured(ctx.logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
                        iteration=iteration, **red_length_stats)
 
     return terminate, first_match
@@ -370,6 +400,7 @@ def check_stopping_criteria(
 # ---------- main loop ----------
 
 def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
+    # ====== PHASE 1: Setup and initialization ======
     out_dir = Path(cfg.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -378,15 +409,28 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     configure_logging(log_file=log_file, level=cfg.logging.level)
     logger = logging.getLogger('pattern_boost.workflow')
+    log_structured(logger, 'info', event='pb_start', config=asdict(cfg))
     matches_path = log_path.parent / f'{log_path.stem}.matches.jsonl'
 
-    log_structured(logger, 'info', event='pb_start', config=asdict(cfg))
+    # ====== PHASE 2: Resolve num_generators (and optionally init compressor) ======
+    compressor = None
+    num_generators = cfg.relators.num_generators
+    if cfg.compression.use_compression:
+        from algorithms.pattern_boost.compression import WordCompressor
+        compressor = WordCompressor(cfg.compression.compression_tokenizer)
+        log_structured(logger, 'info', event='pb_compression_enabled',
+                       bpe_path=cfg.compression.compression_tokenizer,
+                       num_generators=compressor.num_generators,
+                       overrides_relators_num_generators=num_generators)
+        num_generators = compressor.num_generators
 
-    rm = RelatorMap(build_standard_relators(cfg.relators.max_relator_len, cfg.relators.num_generators))
+    # ====== PHASE 2: Build relator map and load challenges ======
+    rm = RelatorMap(build_standard_relators(cfg.relators.max_relator_len, num_generators))
     log_structured(logger, 'info', event='pb_relator_map_built', size=len(rm))
 
     if not cfg.challenges.path:
         raise ValueError('challenges.path must be set in config')
+
     total_in_file = len(json.loads(Path(cfg.challenges.path).read_text()))
     challenge_words, challenge_strs = load_challenges(
         cfg.challenges.path,
@@ -400,11 +444,32 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                    path=cfg.challenges.path,
                    challenge_names=list(challenge_strs.keys()))
 
-    scorer = make_scorer(cfg.scoring.type, challenge_words, cfg.relators.num_generators)
-    ls_cfg = _make_local_search_cfg(cfg.local_search, cfg.relators.num_generators)
+    if compressor:
+        challenge_words = [compressor.encode_str(s) for s in challenge_strs.values()]
+        log_structured(logger, 'info', event='pb_compressed_challenges_loaded',
+                       compressed_challenges=[compressor.compressed_repr(w) for w in challenge_words])
+
+    ctx = _RunCtx(
+        rm=rm,
+        challenge_strs=challenge_strs,
+        logger=logger,
+        scorer_type=cfg.scoring.type,
+        matches_path=matches_path,
+        compressor=compressor,
+    )
+
+    # ====== PHASE 3: Initialize scorer and local searcher ======
+    # TODO: If compressed - scorer will compare compressed strings, however different compressions amy
+    # lead to the same word string. Perhpas should score on expanded/decoded words, not tokens.
+    # so idea is: do local search on compressed wirds beause they shorter, but score on expanded words because
+    # they are many compressed representations, so more chance to hit goal.
+
+    scorer = make_scorer(cfg.scoring.type, challenge_words, num_generators)
+    ls_cfg = _make_local_search_cfg(cfg.local_search, num_generators)
     searcher = LocalSearcher(rm, scorer, ls_cfg)
 
-    sample_cfg = _make_sample_cfg(cfg.initial_sampling, cfg.relators.num_generators)
+    # ====== PHASE 4: Generate initial pool ======
+    sample_cfg = _make_sample_cfg(cfg.initial_sampling, num_generators)
     pool = list(generate_words(rm, sample_cfg, cfg.initial_sampling.n_initial, seed=cfg.seed))
     log_structured(logger, 'info', event='pb_initial_pool', size=len(pool))
 
@@ -416,7 +481,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         log_structured(logger, 'info', event='pb_initial_pool_truncated',
                        kept=len(pool), cap=cfg.workflow.max_pool_size)
 
-        stop, match_name = check_stopping_criteria(scored, rm, challenge_strs, logger, 0)
+        stop, match_name = check_stopping_criteria(ctx, scored, 0)
         if stop:
             log_structured(logger, 'info', event='pb_stopped_early',
                            iteration=0, reason='challenge_match')
@@ -426,8 +491,8 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                 best_score=float(scored[0][0]) if scored else 0.0,
             )
 
-
-    tokenizer = FactoredWordTokenizer(num_generators=cfg.relators.num_generators, num_relators=len(rm))
+    # ====== PHASE 5: Build tokenizer ======
+    tokenizer = FactoredWordTokenizer(num_generators=num_generators, num_relators=len(rm))
     if cfg.tokenizer.use_bpe:
         tokenizer.train_bpe(pool, vocab_size=cfg.tokenizer.vocab_size)
     tokenizer.save(out_dir / 'tokenizer')
@@ -436,6 +501,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                    vocab_size=tokenizer.vocab_size,
                    base_size=len(tokenizer.base_tokens))
 
+    # ====== PHASE 6: Initialize or load model ======
     device = pick_device()
     if cfg.init_model_from:
         model = load_checkpoint(cfg.init_model_from)
@@ -458,17 +524,21 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     summary = RunSummary()
     last_post_scores: list[float] = []
 
+    # ====== PHASE 7: Main iteration loop (train → sample → search → score → keep top) ======
     for it in range(cfg.workflow.num_iterations):
         log_structured(logger, 'info', event='pb_iter_start', iteration=it)
 
+        # Optionally reinitialize model from scratch
         if cfg.workflow.train_from_scratch and it > 0:
             _release_model(model)
             model = build_model(tokenizer, cfg.model)
             log_structured(logger, 'info', event='pb_model_reinitialized',
                            iteration=it, vocab_size=tokenizer.vocab_size)
 
+        # Train model on current pool
         model_train(model, tokenizer, pool, cfg.training, device=device, logger=logger)
 
+        # Sample new candidates from model
         gen_cfg = SampleGenConfig(
             n=cfg.generation.n_samples,
             max_length=cfg.generation.max_length,
@@ -487,6 +557,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
             log_structured(logger, 'warning', event='pb_no_valid_samples', iteration=it)
             continue
 
+        # Local search on each candidate in parallel
         results: list[tuple[float, object]] = []
         workers = cfg.workflow.parallel_workers
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -499,6 +570,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                 score, best_fw = fut.result()
                 results.append((score, best_fw))
 
+        # Score and rank results
         results.sort(key=lambda x: -x[0])
         post_scores = [s for s, _ in results]
         last_post_scores = post_scores
@@ -508,16 +580,23 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         # Log top 3 highest-scored expanded words (results are sorted by score descending)
         top_3_words = []
         for score, fw in results[:3]:
-            expanded_str = word_to_str(rm.expand(fw.factors))
-            top_3_words.append({'score': float(score), 'word': expanded_str})
+            expanded_word = rm.expand(fw.factors)
+            if compressor:
+                entry = {
+                    'score': float(score),
+                    'word': compressor.decode_word(expanded_word),
+                    'compressed_word': compressor.compressed_repr(expanded_word),
+                }
+            else:
+                entry = {'score': float(score), 'word': word_to_str(expanded_word)}
+            top_3_words.append(entry)
 
         if top_3_words:
             log_structured(logger, 'info', event='pb_top_3_candidates',
                            iteration=it, candidates=top_3_words)
 
-        stop, match_name = check_stopping_criteria(results, rm, challenge_strs, logger, it,
-                                                   matches_path=matches_path,
-                                                   scorer_type=cfg.scoring.type)
+        # Check stopping criteria
+        stop, match_name = check_stopping_criteria(ctx, results, it)
         if stop:
             summary.matched = True
             summary.match_iteration = it
@@ -529,11 +608,13 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                            iteration=it, reason='challenge_match')
             break
 
+        # Keep top-k results and merge into pool
         top = [fw for _, fw in results[:cfg.workflow.top_k]]
         pool = _merge_pool(pool, top, rm, cfg.workflow.max_pool_size)
         log_structured(logger, 'info', event='pb_pool_updated',
                        iteration=it, pool_size=len(pool), kept=len(top))
 
+        # Periodically save checkpoints
         save_iter = (it % cfg.workflow.save_every == 0) or (it == cfg.workflow.num_iterations - 1)
         if save_iter:
             iter_dir = out_dir / f'iter_{it:04d}'
@@ -548,6 +629,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
             log_structured(logger, 'info', event='pb_iter_saved',
                            iteration=it, path=str(iter_dir))
 
+    # ====== PHASE 8: Finalize and cleanup ======
     if not summary.matched and last_post_scores:
         summary.total_iterations = cfg.workflow.num_iterations
         summary.best_score = float(last_post_scores[0])

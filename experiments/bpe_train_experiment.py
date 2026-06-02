@@ -19,7 +19,7 @@ import yaml
 
 from algorithms.logger import configure_logging, log_structured
 from data.relators_io import load_relators, convert_to_strings
-from ml.bpe import BPETokenizerWords
+from algorithms.word_compression import BPETokenizerWordCompression
 
 DEFAULT_CONFIG = Path('configs/bpe_train.yaml')
 
@@ -36,7 +36,7 @@ def train_tokenizer(cfg: dict, logger: logging.Logger) -> None:
     log_structured(logger, 'info', event='bpe_train_corpus_loaded',
                    relators=len(word_list))
 
-    tokenizer = BPETokenizerWords(alphabet)
+    tokenizer = BPETokenizerWordCompression(alphabet)
     tokenizer.train(word_list, vocab_size)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

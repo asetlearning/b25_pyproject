@@ -8,7 +8,8 @@ output_dir: output/pattern_boost
 seed: 12345
 
 relators:
-  max_relator_len: 5
+#  max_relator_len: 5
+  max_relator_len: 1 # for compressed experiments
   num_generators: 2
 
 challenges:
@@ -36,9 +37,9 @@ training:
 
 initial_sampling:
   n_initial: 50000
-  min_factors: 3
-  max_factors: 10
-  min_expanded_len: 10
+  min_factors: 2  # 3 reduces for compressed
+  max_factors: 5 # 10 reduced for compressed
+  min_expanded_len: 5
   conj_len_max: 4
 
 generation:
@@ -50,16 +51,16 @@ generation:
   batch_size: 16
 
 local_search:
-  beam_width: 10 # 1
+  beam_width: 3 # 1
   max_steps: 10 # 3
   num_conj_samples: 5
   num_insert_samples: 5
   conj_max_len: 4
-  min_factors: 3
+  min_factors: 1
   max_factors: 10
 
 scoring:
-  type: hamming  # hellinger | hamming | edit
+  type: edit  # hellinger | hamming | edit
 
 workflow:
   num_iterations: 10
@@ -72,3 +73,7 @@ workflow:
 logging:
   level: info
   log_file: null  # null -> output_dir/run.jsonl
+
+compression:
+  use_compression: true
+  compression_tokenizer: models/tokenizer/compression_bpe_sample_n1000_20260519_131825.json  # path to BPETokenizerWordCompression model JSON
