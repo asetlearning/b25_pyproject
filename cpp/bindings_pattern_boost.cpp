@@ -9,6 +9,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "pb_bpe.h"
 #include "pb_relator_map.h"
 #include "pb_sample_generator.h"
 #include "pb_scoring.h"
@@ -224,4 +225,27 @@ void init_pattern_boost(py::module_& parent) {
             },
             py::arg("initial"), py::arg("seed") = 42,
             py::call_guard<py::gil_scoped_release>());
+
+    // --- BPEModel ---
+    py::class_<BPEModel>(pb, "BPEModel")
+        .def(py::init<>())
+        .def(py::init([](
+            std::unordered_map<int, std::string> vocab,
+            std::vector<std::tuple<int, int, int>> merges
+        ) {
+            BPEModel m;
+            m.vocab  = std::move(vocab);
+            m.merges = std::move(merges);
+            return m;
+        }), py::arg("vocab"), py::arg("merges"))
+        .def_readwrite("vocab",  &BPEModel::vocab)
+        .def_readwrite("merges", &BPEModel::merges);
+
+    // --- BPETokenizer ---
+    py::class_<BPETokenizer>(pb, "BPETokenizer")
+        .def(py::init<BPEModel>(), py::arg("model"))
+        .def("encode", &BPETokenizer::encode, py::arg("word"),
+             py::call_guard<py::gil_scoped_release>())
+        .def("decode", &BPETokenizer::decode, py::arg("token_ids"),
+             py::call_guard<py::gil_scoped_release>());
 }
