@@ -55,6 +55,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
+To enforce recreation of modules (recompile local changes of tcgraph, for example)
+
+```bash
+ uv sync --reinstall-package b25-pyproject
+```
+
 ## Testing
 
 Run tests:

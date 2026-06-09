@@ -44,12 +44,16 @@ from algorithms.pattern_boost.pb_tcgraph import (
     LocalSearcher,
     RelatorMap,
     SampleConfig,
+    ScorerConfig,
+    WordCompressor,
     build_standard_relators,
+    bpe_model_from_compressor,
     from_json,
     generate_words,
     to_json,
     uniform_len,
 )
+from algorithms.word_compression import BPETokenizerWordCompression
 from algorithms.pattern_boost.tokenizer import FactoredWordTokenizer
 
 _pb = _ext.pattern_boost
@@ -140,7 +144,7 @@ class WorkflowLoopCfg:
     top_k: int = 100
     max_pool_size: int = 5000
     parallel_workers: int = 4
-    save_every: int = 1
+    save_every: int = -1  # iterations between checkpoints; <= 0 disables all saves
     train_from_scratch: bool = False  # rebuild model with fresh weights each iter
 
 
@@ -304,7 +308,7 @@ def check_stopping_criteria(
         if abs(float(score) - perfect_score) < tol:
             expanded_word = ctx.rm.expand(fw.factors)
             if ctx.compressor:
-                decoded_str = ctx.compressor.decode_word(expanded_word)
+                decoded_str = word_to_str(ctx.compressor.decode_word(expanded_word))
                 log_structured(ctx.logger, 'info', event='pb_perfect_score_candidate',
                                iteration=iteration, score=float(score),
                                word=decoded_str,
@@ -319,7 +323,7 @@ def check_stopping_criteria(
     for score, fw in results:
         expanded_word = ctx.rm.expand(fw.factors)
         if ctx.compressor:
-            cand_str = ctx.compressor.decode_word(expanded_word)
+            cand_str = word_to_str(ctx.compressor.decode_word(expanded_word))
             cand_compressed = ctx.compressor.compressed_repr(expanded_word)
         else:
             cand_str = word_to_str(expanded_word)
@@ -416,8 +420,9 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     compressor = None
     num_generators = cfg.relators.num_generators
     if cfg.compression.use_compression:
-        from algorithms.pattern_boost.compression import WordCompressor
-        compressor = WordCompressor(cfg.compression.compression_tokenizer)
+        _bpe = BPETokenizerWordCompression.from_file(cfg.compression.compression_tokenizer)
+        compressor = WordCompressor(bpe_model_from_compressor(_bpe))
+#        print(compressor.print_mappings())
         log_structured(logger, 'info', event='pb_compression_enabled',
                        bpe_path=cfg.compression.compression_tokenizer,
                        num_generators=compressor.num_generators,
@@ -444,10 +449,13 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                    path=cfg.challenges.path,
                    challenge_names=list(challenge_strs.keys()))
 
+    scorer_config = None
+    scorer_num_generators = num_generators
     if compressor:
-        challenge_words = [compressor.encode_str(s) for s in challenge_strs.values()]
-        log_structured(logger, 'info', event='pb_compressed_challenges_loaded',
-                       compressed_challenges=[compressor.compressed_repr(w) for w in challenge_words])
+        scorer_config = ScorerConfig(word_compressor=compressor)
+        scorer_num_generators = cfg.relators.num_generators
+        log_structured(logger, 'info', event='pb_scorer_decode_compressed',
+                       scorer_num_generators=scorer_num_generators)
 
     ctx = _RunCtx(
         rm=rm,
@@ -459,12 +467,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     )
 
     # ====== PHASE 3: Initialize scorer and local searcher ======
-    # TODO: If compressed - scorer will compare compressed strings, however different compressions amy
-    # lead to the same word string. Perhpas should score on expanded/decoded words, not tokens.
-    # so idea is: do local search on compressed wirds beause they shorter, but score on expanded words because
-    # they are many compressed representations, so more chance to hit goal.
-
-    scorer = make_scorer(cfg.scoring.type, challenge_words, num_generators)
+    scorer = make_scorer(cfg.scoring.type, challenge_words, scorer_num_generators, scorer_config)
     ls_cfg = _make_local_search_cfg(cfg.local_search, num_generators)
     searcher = LocalSearcher(rm, scorer, ls_cfg)
 
@@ -584,7 +587,7 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
             if compressor:
                 entry = {
                     'score': float(score),
-                    'word': compressor.decode_word(expanded_word),
+                    'word': word_to_str(compressor.decode_word(expanded_word)),
                     'compressed_word': compressor.compressed_repr(expanded_word),
                 }
             else:
@@ -615,7 +618,9 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                        iteration=it, pool_size=len(pool), kept=len(top))
 
         # Periodically save checkpoints
-        save_iter = (it % cfg.workflow.save_every == 0) or (it == cfg.workflow.num_iterations - 1)
+        save_iter = cfg.workflow.save_every > 0 and (
+            (it % cfg.workflow.save_every == 0) or (it == cfg.workflow.num_iterations - 1)
+        )
         if save_iter:
             iter_dir = out_dir / f'iter_{it:04d}'
             iter_dir.mkdir(parents=True, exist_ok=True)
