@@ -29,3 +29,5 @@ Thumbs.db
 alex@*
 data/kb_mixer_data/
 .cmake_build/
+cmake-build-*/
+_skbuild/

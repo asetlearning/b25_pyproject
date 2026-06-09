@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <random>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -118,6 +119,16 @@ void init_pattern_boost(py::module_& parent) {
         py::arg("json_path"),
         py::call_guard<py::gil_scoped_release>());
 
+    // --- ScorerConfig ---
+    py::class_<ScorerConfig>(pb, "ScorerConfig")
+        .def(py::init<>())
+        .def(py::init([](std::optional<WordCompressor> wc) {
+            ScorerConfig c;
+            c.word_compressor = std::move(wc);
+            return c;
+        }), py::arg("word_compressor") = std::nullopt)
+        .def_readwrite("word_compressor", &ScorerConfig::word_compressor);
+
     // --- WordScorer (abstract base) ---
     py::class_<WordScorer>(pb, "WordScorer");
 
@@ -125,6 +136,8 @@ void init_pattern_boost(py::module_& parent) {
     py::class_<HellingerScorer, WordScorer>(pb, "HellingerScorer")
         .def(py::init<std::vector<Word>, size_t>(),
              py::arg("challenges"), py::arg("num_generators"))
+        .def(py::init<std::vector<Word>, size_t, ScorerConfig>(),
+             py::arg("challenges"), py::arg("num_generators"), py::arg("config"))
         .def("score_word",
              &HellingerScorer::scoreWord,
              py::arg("word"))
@@ -136,6 +149,8 @@ void init_pattern_boost(py::module_& parent) {
     py::class_<HammingScorer, WordScorer>(pb, "HammingScorer")
         .def(py::init<std::vector<Word>>(),
              py::arg("challenges"))
+        .def(py::init<std::vector<Word>, ScorerConfig>(),
+             py::arg("challenges"), py::arg("config"))
         .def("score_word",
              &HammingScorer::scoreWord,
              py::arg("word"))
@@ -147,6 +162,8 @@ void init_pattern_boost(py::module_& parent) {
     py::class_<EditScorer, WordScorer>(pb, "EditScorer")
         .def(py::init<std::vector<Word>>(),
              py::arg("challenges"))
+        .def(py::init<std::vector<Word>, ScorerConfig>(),
+             py::arg("challenges"), py::arg("config"))
         .def("score_word",
              &EditScorer::scoreWord,
              py::arg("word"))
@@ -231,15 +248,18 @@ void init_pattern_boost(py::module_& parent) {
         .def(py::init<>())
         .def(py::init([](
             std::unordered_map<int, std::string> vocab,
-            std::vector<std::tuple<int, int, int>> merges
+            std::vector<std::tuple<int, int, int>> merges,
+            std::string eow
         ) {
             BPEModel m;
             m.vocab  = std::move(vocab);
             m.merges = std::move(merges);
+            m.eow    = std::move(eow);
             return m;
-        }), py::arg("vocab"), py::arg("merges"))
+        }), py::arg("vocab"), py::arg("merges"), py::arg("eow") = "")
         .def_readwrite("vocab",  &BPEModel::vocab)
-        .def_readwrite("merges", &BPEModel::merges);
+        .def_readwrite("merges", &BPEModel::merges)
+        .def_readwrite("eow",    &BPEModel::eow);
 
     // --- BPETokenizer ---
     py::class_<BPETokenizer>(pb, "BPETokenizer")
@@ -248,4 +268,32 @@ void init_pattern_boost(py::module_& parent) {
              py::call_guard<py::gil_scoped_release>())
         .def("decode", &BPETokenizer::decode, py::arg("token_ids"),
              py::call_guard<py::gil_scoped_release>());
+
+    // --- WordCompressor ---
+    // Maps BPE tokens to a compact generator space (1..N) for use in PatternBoost.
+    // Non-EOW tokens are assigned generators in sorted-ID order.  When token A decodes to
+    // word W and token B decodes to W^{-1}, they share a generator: A → +k, B → -k,
+    // halving the generator count for inverse-paired tokens.
+    py::class_<WordCompressor>(pb, "WordCompressor")
+        .def(py::init<BPEModel>(), py::arg("model"))
+        // BPE-encode word_str → Word in compressed generator space (letters 1..N).
+        // Each BPE token is replaced by its generator index; inverse tokens get negative index.
+        .def("encode_str", &WordCompressor::encodeStr, py::arg("word_str"),
+             py::call_guard<py::gil_scoped_release>())
+        // Decode compressed Word → generator-space Word.
+        // +k → canonical token string for generator k; -k → its inverse string.
+        .def("decode_word", &WordCompressor::decodeWord, py::arg("word"),
+             py::call_guard<py::gil_scoped_release>())
+        // Human-readable [ab][BA][a] form of a compressed Word.
+        .def("compressed_repr", &WordCompressor::compressedRepr, py::arg("word"),
+             py::call_guard<py::gil_scoped_release>())
+        // Number of generators N (each inverse pair counts as one generator).
+        .def_property_readonly("num_generators", &WordCompressor::numGenerators)
+        // Full token↔generator mapping as a string, one generator per line.
+        // Each line shows the canonical token (+gen) and its inverse token (-gen) if one exists.
+        .def("print_mappings", [](const WordCompressor& wc) {
+            std::ostringstream oss;
+            wc.printMappings(oss);
+            return oss.str();
+        }, py::call_guard<py::gil_scoped_release>());
 }

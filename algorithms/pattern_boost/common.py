@@ -19,18 +19,20 @@ from algorithms.pattern_boost.pb_tcgraph import (
 )
 
 
-def make_scorer(score_type: str, challenges, num_generators: int):
+def make_scorer(score_type: str, challenges, num_generators: int, config=None):
     """Build a WordScorer by name.
 
     score_type: 'hellinger' | 'hamming' | 'edit' (case-insensitive).
+    config: optional ScorerConfig; when None, scorer uses standard (uncompressed) behavior.
     """
+    extra = (config,) if config is not None else ()
     t = score_type.lower()
     if t == 'hellinger':
-        return HellingerScorer(challenges, num_generators)
+        return HellingerScorer(challenges, num_generators, *extra)
     if t == 'hamming':
-        return HammingScorer(challenges)
+        return HammingScorer(challenges, *extra)
     if t == 'edit':
-        return EditScorer(challenges)
+        return EditScorer(challenges, *extra)
     raise ValueError(f'unknown scorer type: {score_type}')
 
 
