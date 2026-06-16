@@ -26,7 +26,7 @@ def _imports():
 @app.cell
 def _inputs(mo):
     folder_input = mo.ui.text(
-        value="output/pb_sweep/sweep_20260522_013909",
+        value="data/pattern_boost_experiments/pb_sweep/sweep_20260522_013909",
         label="Sweep root directory",
         full_width=True,
     )
@@ -37,6 +37,18 @@ def _inputs(mo):
     )
     mo.vstack([folder_input, config_input])
     return (folder_input, config_input)
+
+
+@app.cell
+def _legend(mo):
+    mo.callout(
+        mo.md(
+            "**Combo label abbreviations:** "
+            "`e` = epochs · `w` = beam\\_width · `s` = max\\_steps · `p` = max\\_pool\\_size  \n"
+            "Example: `e10.w10.s5.p5000` → epochs=10, beam\\_width=10, max\\_steps=5, max\\_pool\\_size=5000"
+        ),
+        kind="info",
+    )
 
 
 @app.cell
@@ -98,8 +110,9 @@ def _parse(folder_input, config_input, json, yaml, datetime, pd, Path):
                     except (KeyError, TypeError):
                         _params[col] = None
 
+            _abbrev = {"epochs": "e", "beam_width": "w", "max_steps": "s", "max_pool_size": "p"}
             label = (
-                "_".join(f"{c}={_params[c]}" for c in param_cols)
+                ".".join(f"{_abbrev.get(c, c)}{_params[c]}" for c in param_cols)
                 if _params else combo_dir.name
             )
 

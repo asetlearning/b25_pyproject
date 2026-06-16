@@ -46,6 +46,7 @@ from algorithms.pattern_boost.pb_tcgraph import (
     SampleConfig,
     ScorerConfig,
     WordCompressor,
+    build_hybrid_relators,
     build_standard_relators,
     bpe_model_from_compressor,
     from_json,
@@ -87,6 +88,7 @@ class _RunCtx:
 class RelatorsCfg:
     max_relator_len: int = 5
     num_generators: int = 2
+    standard_generator_tokens: Optional[list[str]] = None  # resolved to indices via compressor
 
 
 @dataclass
@@ -136,6 +138,7 @@ class LocalSearchCfg:
 @dataclass
 class ScoringCfg:
     type: str = 'hellinger'  # hellinger | hamming | edit
+    reduce2_5: bool = False  # apply greedy 2.5 reduction before scoring
 
 
 @dataclass
@@ -202,6 +205,17 @@ def load_config(path) -> WorkflowConfig:
 
 
 # ---------- helpers ----------
+
+def _resolve_standard_generators(tokens: list[str], compressor) -> list[int]:
+    indices = []
+    for tok in tokens:
+        word = compressor.encode_str(tok)
+        letters = word.get_letters()
+        if len(letters) != 1:
+            raise ValueError(f"Token '{tok}' encodes to {len(letters)} generators, expected 1")
+        indices.append(abs(letters[0]))
+    return indices
+
 
 def _make_local_search_cfg(cfg: LocalSearchCfg, num_generators: int) -> LocalSearchConfig:
     ls = LocalSearchConfig()
@@ -430,7 +444,12 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         num_generators = compressor.num_generators
 
     # ====== PHASE 2: Build relator map and load challenges ======
-    rm = RelatorMap(build_standard_relators(cfg.relators.max_relator_len, num_generators))
+    std_gens = None
+    if cfg.relators.standard_generator_tokens is not None:
+        if compressor is None:
+            raise ValueError("standard_generator_tokens requires use_compression=true")
+        std_gens = _resolve_standard_generators(cfg.relators.standard_generator_tokens, compressor)
+    rm = RelatorMap(build_hybrid_relators(cfg.relators.max_relator_len, num_generators, std_gens))
     log_structured(logger, 'info', event='pb_relator_map_built', size=len(rm))
 
     if not cfg.challenges.path:
@@ -449,13 +468,27 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                    path=cfg.challenges.path,
                    challenge_names=list(challenge_strs.keys()))
 
+    if compressor:
+        encoded_challenges = {}
+        for name, word_str in challenge_strs.items():
+            compressed_letters = list(compressor.encode_str(word_str).get_letters())
+            encoded_challenges[name] = {
+                'word_len': len(word_str),
+                'compressed_word': compressed_letters,
+                'compressed_word_len': len(compressed_letters),
+            }
+        log_structured(logger, 'info', event='pb_challenges_encoded',
+                       challenges=encoded_challenges)
+
     scorer_config = None
     scorer_num_generators = num_generators
     if compressor:
-        scorer_config = ScorerConfig(word_compressor=compressor)
+        scorer_config = ScorerConfig(word_compressor=compressor, reduce2_5=cfg.scoring.reduce2_5)
         scorer_num_generators = cfg.relators.num_generators
         log_structured(logger, 'info', event='pb_scorer_decode_compressed',
                        scorer_num_generators=scorer_num_generators)
+    elif cfg.scoring.reduce2_5:
+        scorer_config = ScorerConfig(reduce2_5=True)
 
     ctx = _RunCtx(
         rm=rm,
@@ -585,13 +618,18 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         for score, fw in results[:3]:
             expanded_word = rm.expand(fw.factors)
             if compressor:
+                word_str = word_to_str(compressor.decode_word(expanded_word))
+                compressed_letters = list(expanded_word.get_letters())
                 entry = {
                     'score': float(score),
-                    'word': word_to_str(compressor.decode_word(expanded_word)),
-                    'compressed_word': compressor.compressed_repr(expanded_word),
+                    'word': word_str,
+                    'word_len': len(word_str),
+                    'compressed_word': compressed_letters,
+                    'compressed_word_len': len(compressed_letters),
                 }
             else:
-                entry = {'score': float(score), 'word': word_to_str(expanded_word)}
+                word_str = word_to_str(expanded_word)
+                entry = {'score': float(score), 'word': word_str, 'word_len': len(word_str)}
             top_3_words.append(entry)
 
         if top_3_words:

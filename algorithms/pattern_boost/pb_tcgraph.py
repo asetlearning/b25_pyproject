@@ -2,6 +2,7 @@
 # Date: April 24, 2026
 
 import tcgraph_ext as _ext
+from algorithms.pattern_boost.relators import build_hybrid_relators
 from algorithms.word_conversion import string_to_word
 
 _pb = _ext.pattern_boost
