@@ -122,12 +122,14 @@ void init_pattern_boost(py::module_& parent) {
     // --- ScorerConfig ---
     py::class_<ScorerConfig>(pb, "ScorerConfig")
         .def(py::init<>())
-        .def(py::init([](std::optional<WordCompressor> wc) {
+        .def(py::init([](std::optional<WordCompressor> wc, bool r25) {
             ScorerConfig c;
             c.word_compressor = std::move(wc);
+            c.reduce2_5 = r25;
             return c;
-        }), py::arg("word_compressor") = std::nullopt)
-        .def_readwrite("word_compressor", &ScorerConfig::word_compressor);
+        }), py::arg("word_compressor") = std::nullopt, py::arg("reduce2_5") = false)
+        .def_readwrite("word_compressor", &ScorerConfig::word_compressor)
+        .def_readwrite("reduce2_5", &ScorerConfig::reduce2_5);
 
     // --- WordScorer (abstract base) ---
     py::class_<WordScorer>(pb, "WordScorer");

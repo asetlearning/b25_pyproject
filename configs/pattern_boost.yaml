@@ -8,12 +8,12 @@ output_dir: output/pattern_boost
 seed: 12345
 
 relators:
-#  max_relator_len: 5
-  max_relator_len: 1 # for compressed experiments
+  max_relator_len: 5
   num_generators: 2
+#  standard_generator_tokens: ["a", "b"]  # token strings for standard generators; requires use_compression=true
 
 challenges:
-#  path:  data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced_1.json
+#  path: data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced_1.json
   path: data/pattern_boost_experiments/relator_sets/relators_sample_n1000_20260519_131825.json
   sample_size: 1
 
@@ -22,8 +22,8 @@ tokenizer:
   vocab_size: 512  # only used when use_bpe is true
 
 model:
-  n_layer: 4
-  n_head: 4
+  n_layer: 6
+  n_head: 8
   n_embd: 256
   n_positions: 512
 
@@ -37,13 +37,13 @@ training:
 
 initial_sampling:
   n_initial: 50000
-  min_factors: 2  # 3 reduces for compressed
-  max_factors: 5 # 10 reduced for compressed
+  min_factors: 3
+  max_factors: 10
   min_expanded_len: 5
   conj_len_max: 4
 
 generation:
-  n_samples: 5100
+  n_samples: 1200
   max_length: 512
   temperature: 1.0
   top_k: 50
@@ -51,7 +51,7 @@ generation:
   batch_size: 16
 
 local_search:
-  beam_width: 3 # 1
+  beam_width: 2 # 1
   max_steps: 10 # 3
   num_conj_samples: 5
   num_insert_samples: 5
@@ -61,13 +61,14 @@ local_search:
 
 scoring:
   type: edit  # hellinger | hamming | edit
+  reduce2_5: false  # apply greedy 2.5 reduction to word before scoring
 
 workflow:
-  num_iterations: 10
-  top_k: 5000
-  max_pool_size: 5000
-  parallel_workers: 10
-  save_every: 10
+  num_iterations: 20
+  top_k: 1000
+  max_pool_size: 1000
+  parallel_workers: 12
+  save_every: -1
   train_from_scratch: false  # rebuild model with fresh weights each iter
 
 logging:
@@ -75,5 +76,6 @@ logging:
   log_file: null  # null -> output_dir/run.jsonl
 
 compression:
-  use_compression: true
-  compression_tokenizer: models/tokenizer/compression_bpe_sample_n1000_20260519_131825.json  # path to BPETokenizerWordCompression model JSON
+  use_compression: false
+  compression_tokenizer: models/tokenizer/compression_bpe_sample_n1000_20260519_131825_relator_R426.json
+#  models/tokenizer/compression_bpe_sample_n1000_20260519_131825.json  # path to BPETokenizerWordCompression model JSON
