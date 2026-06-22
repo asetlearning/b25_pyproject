@@ -14,6 +14,7 @@ import gc
 import json
 import logging
 import statistics
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -40,6 +41,7 @@ from algorithms.pattern_boost.model import (
     train as model_train,
 )
 from algorithms.pattern_boost.pb_tcgraph import (
+    ConjMoveStrategy,
     LocalSearchConfig,
     LocalSearcher,
     RelatorMap,
@@ -133,6 +135,7 @@ class LocalSearchCfg:
     conj_max_len: int = 4
     min_factors: int = 1
     max_factors: int = 50
+    conj_move_strategy: str = 'deterministic'  # deterministic | random
 
 
 @dataclass
@@ -227,6 +230,8 @@ def _make_local_search_cfg(cfg: LocalSearchCfg, num_generators: int) -> LocalSea
     ls.min_factors = cfg.min_factors
     ls.max_factors = cfg.max_factors
     ls.num_generators = num_generators
+    ls.conj_move_strategy = (ConjMoveStrategy.kRandom if cfg.conj_move_strategy == 'random'
+                              else ConjMoveStrategy.kDeterministic)
     return ls
 
 
@@ -595,16 +600,37 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
 
         # Local search on each candidate in parallel
         results: list[tuple[float, object]] = []
+        search_metadata: list[dict] = []
+        search_times: list[float] = []
         workers = cfg.workflow.parallel_workers
+
+        def _timed_search(fw, seed):
+            t0 = time.perf_counter()
+            sr = searcher.search(fw, seed)
+            return sr, time.perf_counter() - t0
+
         with ThreadPoolExecutor(max_workers=workers) as ex:
             futures = {
-                ex.submit(searcher.search, fw, cfg.seed + it * 1000 + i): i
+                ex.submit(_timed_search, fw, cfg.seed + it * 1000 + i): i
                 for i, fw in enumerate(candidates)
             }
             for fut in tqdm(as_completed(futures), total=len(futures),
                             desc=f'iter {it} search'):
-                score, best_fw = fut.result()
-                results.append((score, best_fw))
+                sr, elapsed = fut.result()
+                results.append((sr.score, sr.best_fw))
+                search_metadata.append(sr.metadata)
+                search_times.append(elapsed)
+
+        if search_metadata:
+            nbr_sizes = [m["avg_neighborhood_size"] for m in search_metadata
+                         if "avg_neighborhood_size" in m]
+            word_lens = [m["avg_expanded_word_len"] for m in search_metadata
+                         if "avg_expanded_word_len" in m]
+            log_structured(logger, 'info', event='pb_search_metadata',
+                           iteration=it,
+                           avg_neighborhood_size=statistics.mean(nbr_sizes) if nbr_sizes else None,
+                           avg_expanded_word_len=statistics.mean(word_lens) if word_lens else None,
+                           avg_worker_time_s=statistics.mean(search_times) if search_times else None)
 
         # Score and rank results
         results.sort(key=lambda x: -x[0])
@@ -617,6 +643,12 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         top_3_words = []
         for score, fw in results[:3]:
             expanded_word = rm.expand(fw.factors)
+            factors = fw.factors
+            num_factors = len(factors)
+            conj_lens = [len(list(f.conjugator.get_letters())) for f in factors]
+            avg_conj_len = statistics.mean(conj_lens) if conj_lens else 0.0
+            token_ids = tokenizer.encode(fw)
+            factor_str = ' '.join(tokenizer._fw_to_base_tokens(fw))
             if compressor:
                 word_str = word_to_str(compressor.decode_word(expanded_word))
                 compressed_letters = list(expanded_word.get_letters())
@@ -626,10 +658,24 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                     'word_len': len(word_str),
                     'compressed_word': compressed_letters,
                     'compressed_word_len': len(compressed_letters),
+                    'num_factors': num_factors,
+                    'avg_conj_len': avg_conj_len,
+                    'token_ids': token_ids,
+                    'token_len': len(token_ids),
+                    'factor_str': factor_str,
                 }
             else:
                 word_str = word_to_str(expanded_word)
-                entry = {'score': float(score), 'word': word_str, 'word_len': len(word_str)}
+                entry = {
+                    'score': float(score),
+                    'word': word_str,
+                    'word_len': len(word_str),
+                    'num_factors': num_factors,
+                    'avg_conj_len': avg_conj_len,
+                    'token_ids': token_ids,
+                    'token_len': len(token_ids),
+                    'factor_str': factor_str,
+                }
             top_3_words.append(entry)
 
         if top_3_words:
