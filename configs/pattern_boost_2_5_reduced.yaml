@@ -13,7 +13,7 @@ relators:
 #  standard_generator_tokens: ["a", "b"]  # token strings for standard generators; requires use_compression=true
 
 challenges:
-  path: data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced_1.json
+  path: data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced_2.json
 #  path: data/pattern_boost_experiments/relator_sets/relators_sample_n1000_20260519_131825.json
   sample_size: 1
 
@@ -29,7 +29,7 @@ model:
 
 training:
   batch_size: 16
-  epochs: 50
+  epochs: 10
   lr: 5.0e-4
   weight_decay: 0.01
   grad_clip: 1.0
@@ -37,13 +37,13 @@ training:
 
 initial_sampling:
   n_initial: 50000
-  min_factors: 3
-  max_factors: 20
+  min_factors: 10
+  max_factors: 50
   min_expanded_len: 60
   conj_len_max: 20
 
 generation:
-  n_samples: 1200
+  n_samples: 1500
   max_length: 512
   temperature: 1.0
   top_k: 50
@@ -51,20 +51,21 @@ generation:
   batch_size: 16
 
 local_search:
-  beam_width: 1 # 1
-  max_steps: 20 # 3
-  num_conj_samples: 5
-  num_insert_samples: 5
-  conj_max_len: 20
-  min_factors: 1
-  max_factors: 20
+  beam_width: 3 # 1 = greedy
+  max_steps: 10 # 3
+  num_conj_samples: 5 # random conjugator mutations per factor per step (Random strat only)
+  num_insert_samples: 5 # random factor insertions per step
+  conj_max_len: 4 # max conjugator length for mutations/insertions (Random strat only)
+  min_factors: 2 # don't delete below this
+  max_factors: 100 # don't insert above this'
+  conj_move_strategy: deterministic  # deterministic | random
 
 scoring:
   type: edit  # hellinger | hamming | edit
-  reduce2_5: true  # apply greedy 2.5 reduction to word before scoring
+  reduce2_5: false  # apply greedy 2.5 reduction to word before scoring
 
 workflow:
-  num_iterations: 10
+  num_iterations: 20
   top_k: 1000
   max_pool_size: 1000
   parallel_workers: 12

@@ -19,6 +19,7 @@ ScorerConfig = _pb.ScorerConfig
 HellingerScorer = _pb.HellingerScorer
 HammingScorer = _pb.HammingScorer
 EditScorer = _pb.EditScorer
+ConjMoveStrategy = _pb.ConjMoveStrategy
 LocalSearchConfig = _pb.LocalSearchConfig
 LocalSearcher = _pb.LocalSearcher
 BPEModel = _pb.BPEModel

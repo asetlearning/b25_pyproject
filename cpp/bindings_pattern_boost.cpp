@@ -173,40 +173,60 @@ void init_pattern_boost(py::module_& parent) {
              &EditScorer::scoreSample,
              py::arg("fw"), py::arg("rm"));
 
+    // --- ConjMoveStrategy ---
+    py::enum_<ConjMoveStrategy>(pb, "ConjMoveStrategy")
+        .value("kDeterministic", ConjMoveStrategy::kDeterministic)
+        .value("kRandom",        ConjMoveStrategy::kRandom)
+        .export_values();
+
     // --- LocalSearchConfig ---
     py::class_<LocalSearchConfig>(pb, "LocalSearchConfig")
         .def(py::init<>())
-        .def_readwrite("beam_width",         &LocalSearchConfig::beam_width)
-        .def_readwrite("max_steps",          &LocalSearchConfig::max_steps)
-        .def_readwrite("num_conj_samples",   &LocalSearchConfig::num_conj_samples)
-        .def_readwrite("num_insert_samples", &LocalSearchConfig::num_insert_samples)
-        .def_readwrite("conj_max_len",       &LocalSearchConfig::conj_max_len)
-        .def_readwrite("min_factors",        &LocalSearchConfig::min_factors)
-        .def_readwrite("max_factors",        &LocalSearchConfig::max_factors)
-        .def_readwrite("num_generators",     &LocalSearchConfig::num_generators)
+        .def_readwrite("beam_width",           &LocalSearchConfig::beam_width)
+        .def_readwrite("max_steps",            &LocalSearchConfig::max_steps)
+        .def_readwrite("num_conj_samples",     &LocalSearchConfig::num_conj_samples)
+        .def_readwrite("num_insert_samples",   &LocalSearchConfig::num_insert_samples)
+        .def_readwrite("conj_max_len",         &LocalSearchConfig::conj_max_len)
+        .def_readwrite("min_factors",          &LocalSearchConfig::min_factors)
+        .def_readwrite("max_factors",          &LocalSearchConfig::max_factors)
+        .def_readwrite("num_generators",       &LocalSearchConfig::num_generators)
+        .def_readwrite("conj_move_strategy",   &LocalSearchConfig::conj_move_strategy)
         .def("to_dict", [](const LocalSearchConfig& c) {
             py::dict d;
-            d["beam_width"]         = c.beam_width;
-            d["max_steps"]          = c.max_steps;
-            d["num_conj_samples"]   = c.num_conj_samples;
-            d["num_insert_samples"] = c.num_insert_samples;
-            d["conj_max_len"]       = c.conj_max_len;
-            d["min_factors"]        = c.min_factors;
-            d["max_factors"]        = c.max_factors;
-            d["num_generators"]     = c.num_generators;
+            d["beam_width"]          = c.beam_width;
+            d["max_steps"]           = c.max_steps;
+            d["num_conj_samples"]    = c.num_conj_samples;
+            d["num_insert_samples"]  = c.num_insert_samples;
+            d["conj_max_len"]        = c.conj_max_len;
+            d["min_factors"]         = c.min_factors;
+            d["max_factors"]         = c.max_factors;
+            d["num_generators"]      = c.num_generators;
+            d["conj_move_strategy"]  = c.conj_move_strategy == ConjMoveStrategy::kRandom
+                                       ? std::string("random") : std::string("deterministic");
             return d;
         })
         .def("__repr__", [](const LocalSearchConfig& c) {
             return "LocalSearchConfig(" +
-                std::string("beam_width=")         + std::to_string(c.beam_width) +
-                ", max_steps="                     + std::to_string(c.max_steps) +
-                ", num_conj_samples="              + std::to_string(c.num_conj_samples) +
-                ", num_insert_samples="            + std::to_string(c.num_insert_samples) +
-                ", conj_max_len="                  + std::to_string(c.conj_max_len) +
-                ", min_factors="                   + std::to_string(c.min_factors) +
-                ", max_factors="                   + std::to_string(c.max_factors) +
-                ", num_generators="                + std::to_string(c.num_generators) +
+                std::string("beam_width=")           + std::to_string(c.beam_width) +
+                ", max_steps="                       + std::to_string(c.max_steps) +
+                ", num_conj_samples="                + std::to_string(c.num_conj_samples) +
+                ", num_insert_samples="              + std::to_string(c.num_insert_samples) +
+                ", conj_max_len="                    + std::to_string(c.conj_max_len) +
+                ", min_factors="                     + std::to_string(c.min_factors) +
+                ", max_factors="                     + std::to_string(c.max_factors) +
+                ", num_generators="                  + std::to_string(c.num_generators) +
+                ", conj_move_strategy="              + (c.conj_move_strategy == ConjMoveStrategy::kRandom
+                                                       ? std::string("random") : std::string("deterministic")) +
                 ")";
+        });
+
+    // --- SearchResult ---
+    py::class_<SearchResult>(pb, "SearchResult")
+        .def_readonly("score",   &SearchResult::score)
+        .def_readonly("best_fw", &SearchResult::best_fw)
+        .def_property_readonly("metadata", [](const SearchResult& r) {
+            auto json_mod = py::module_::import("json");
+            return json_mod.attr("loads")(r.metadata.dump());
         });
 
     // --- LocalSearcher — scorer bakes in challenges at construction ---

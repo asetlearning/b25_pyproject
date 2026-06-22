@@ -51,13 +51,14 @@ generation:
   batch_size: 16
 
 local_search:
-  beam_width: 2 # 1
+  beam_width: 1 # 1 = greedy
   max_steps: 10 # 3
-  num_conj_samples: 5
-  num_insert_samples: 5
-  conj_max_len: 4
-  min_factors: 1
-  max_factors: 10
+  num_conj_samples: 5 # random conjugator mutations per factor per step (Random strat only)
+  num_insert_samples: 5 # random factor insertions per step
+  conj_max_len: 4 # max conjugator length for mutations/insertions (Random strat only)
+  min_factors: 1 # don't delete below this
+  max_factors: 10 # don't insert above this'
+  conj_move_strategy: deterministic  # deterministic | random
 
 scoring:
   type: edit  # hellinger | hamming | edit
