@@ -149,5 +149,8 @@ def log_structured(logger: logging.Logger, level: str, **fields) -> None:
         )
     """
     log_method = getattr(logger, level.lower())
-    # Empty message, all data in extra
-    log_method('', extra=fields)
+    # Rename keys that collide with reserved LogRecord attributes.
+    # CPython explicitly forbids "message" and "asctime" plus any key already in __dict__.
+    _reserved = frozenset(logging.LogRecord('', 0, '', 0, '', (), None).__dict__) | {"message", "asctime"}
+    safe = {(f'log_{k}' if k in _reserved else k): v for k, v in fields.items()}
+    log_method('', extra=safe)

@@ -37,7 +37,7 @@ sampling:
 
 scoring:
   challenges: experiments/pattern_boost/relators_shortlex_rules_2.5reduced_1.json       # optional relators_io-style JSON; when set, sampled.jsonl gets a "score" field
-  type: edit        # hellinger | hamming | edit
+  type: edit        # hellinger | hamming | edit | word_product_length | abelianized_product_length | high_power_count
 
 logging:
   level: info

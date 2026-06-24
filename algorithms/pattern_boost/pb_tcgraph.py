@@ -19,6 +19,11 @@ ScorerConfig = _pb.ScorerConfig
 HellingerScorer = _pb.HellingerScorer
 HammingScorer = _pb.HammingScorer
 EditScorer = _pb.EditScorer
+WordProductLengthScorer = _pb.WordProductLengthScorer
+AbelianizedProductLengthScorer = _pb.AbelianizedProductLengthScorer
+HighPowerCountScorer = _pb.HighPowerCountScorer
+LengthRangeScorer = _pb.LengthRangeScorer
+HybridScorer = _pb.HybridScorer
 ConjMoveStrategy = _pb.ConjMoveStrategy
 LocalSearchConfig = _pb.LocalSearchConfig
 LocalSearcher = _pb.LocalSearcher
@@ -40,6 +45,8 @@ hellinger_distance = _pb.hellinger_distance
 hamming_distance = _pb.hamming_distance
 edit_distance = _pb.edit_distance
 load_challenges = _pb.load_challenges
+make_hybrid_scorer = _pb.make_hybrid_scorer
+length_range_score = _pb.length_range_score
 
 
 def score_word(word, scorer):

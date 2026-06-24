@@ -42,6 +42,7 @@ from algorithms.pattern_boost.model import (
 )
 from algorithms.pattern_boost.pb_tcgraph import (
     ConjMoveStrategy,
+    HybridScorer,
     LocalSearchConfig,
     LocalSearcher,
     RelatorMap,
@@ -140,8 +141,11 @@ class LocalSearchCfg:
 
 @dataclass
 class ScoringCfg:
-    type: str = 'hellinger'  # hellinger | hamming | edit
+    type: str = 'hellinger'  # hellinger | hamming | edit | word_product_length | abelianized_product_length | high_power_count | length_range | hybrid
     reduce2_5: bool = False  # apply greedy 2.5 reduction before scoring
+    penalize_trivial: bool = False  # score 0.0 for words that reduce to the identity
+    components: Optional[list] = None  # for hybrid only: [{type, weight, params?}]
+    params: Optional[dict] = None  # for length_range / high_power_count top-level
 
 
 @dataclass
@@ -339,6 +343,8 @@ def check_stopping_criteria(
 
     cand_lengths = []
     cand_red_lengths = []
+    nonzero_red_count = 0
+    top3_reduced: list[dict] = []
     for score, fw in results:
         expanded_word = ctx.rm.expand(fw.factors)
         if ctx.compressor:
@@ -362,6 +368,10 @@ def check_stopping_criteria(
         cand_red = greedy_reduce2_5(cand_str)
         cand_lengths.append(len(cand_str))
         cand_red_lengths.append(len(cand_red))
+        if len(cand_red) > 0:
+            nonzero_red_count += 1
+        if len(top3_reduced) < 3:
+            top3_reduced.append({'score': float(score), 'word': cand_red, 'len': len(cand_red)})
 
         doubled = cand_str + cand_str
         for name, chal_str in ctx.challenge_strs.items():
@@ -415,7 +425,9 @@ def check_stopping_criteria(
             'avg_goal': statistics.mean([len(chal_str) for chal_str in ctx.challenge_strs.values()]),
         }
         log_structured(ctx.logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
-                       iteration=iteration, **red_length_stats)
+                       iteration=iteration, **red_length_stats,
+                       nonzero_reduced_count=nonzero_red_count,
+                       top3_reduced_words=top3_reduced)
 
     return terminate, first_match
 
@@ -488,12 +500,17 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     scorer_config = None
     scorer_num_generators = num_generators
     if compressor:
-        scorer_config = ScorerConfig(word_compressor=compressor, reduce2_5=cfg.scoring.reduce2_5)
+        scorer_config = ScorerConfig(
+            word_compressor=compressor,
+            reduce2_5=cfg.scoring.reduce2_5,
+            penalize_trivial=cfg.scoring.penalize_trivial)
         scorer_num_generators = cfg.relators.num_generators
         log_structured(logger, 'info', event='pb_scorer_decode_compressed',
                        scorer_num_generators=scorer_num_generators)
-    elif cfg.scoring.reduce2_5:
-        scorer_config = ScorerConfig(reduce2_5=True)
+    elif cfg.scoring.reduce2_5 or cfg.scoring.penalize_trivial:
+        scorer_config = ScorerConfig(
+            reduce2_5=cfg.scoring.reduce2_5,
+            penalize_trivial=cfg.scoring.penalize_trivial)
 
     ctx = _RunCtx(
         rm=rm,
@@ -505,7 +522,10 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     )
 
     # ====== PHASE 3: Initialize scorer and local searcher ======
-    scorer = make_scorer(cfg.scoring.type, challenge_words, scorer_num_generators, scorer_config)
+    scorer = make_scorer(
+        cfg.scoring.type, challenge_words, scorer_num_generators,
+        scorer_config, components=cfg.scoring.components, params=cfg.scoring.params
+    )
     ls_cfg = _make_local_search_cfg(cfg.local_search, num_generators)
     searcher = LocalSearcher(rm, scorer, ls_cfg)
 
@@ -676,6 +696,12 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
                     'token_len': len(token_ids),
                     'factor_str': factor_str,
                 }
+            if isinstance(scorer, HybridScorer) and cfg.scoring.components:
+                breakdown = scorer.score_word_components(expanded_word)
+                entry['component_scores'] = [
+                    {'type': comp['type'], 'weight': float(comp.get('weight', 1.0)), 'score': float(s)}
+                    for comp, (s, _w) in zip(cfg.scoring.components, breakdown)
+                ]
             top_3_words.append(entry)
 
         if top_3_words:

@@ -122,20 +122,24 @@ void init_pattern_boost(py::module_& parent) {
     // --- ScorerConfig ---
     py::class_<ScorerConfig>(pb, "ScorerConfig")
         .def(py::init<>())
-        .def(py::init([](std::optional<WordCompressor> wc, bool r25) {
+        .def(py::init([](std::optional<WordCompressor> wc, bool r25, bool pt) {
             ScorerConfig c;
             c.word_compressor = std::move(wc);
             c.reduce2_5 = r25;
+            c.penalize_trivial = pt;
             return c;
-        }), py::arg("word_compressor") = std::nullopt, py::arg("reduce2_5") = false)
+        }), py::arg("word_compressor") = std::nullopt,
+            py::arg("reduce2_5") = false,
+            py::arg("penalize_trivial") = false)
         .def_readwrite("word_compressor", &ScorerConfig::word_compressor)
-        .def_readwrite("reduce2_5", &ScorerConfig::reduce2_5);
+        .def_readwrite("reduce2_5", &ScorerConfig::reduce2_5)
+        .def_readwrite("penalize_trivial", &ScorerConfig::penalize_trivial);
 
     // --- WordScorer (abstract base) ---
-    py::class_<WordScorer>(pb, "WordScorer");
+    py::class_<WordScorer, std::shared_ptr<WordScorer>>(pb, "WordScorer");
 
     // --- HellingerScorer ---
-    py::class_<HellingerScorer, WordScorer>(pb, "HellingerScorer")
+    py::class_<HellingerScorer, WordScorer, std::shared_ptr<HellingerScorer>>(pb, "HellingerScorer")
         .def(py::init<std::vector<Word>, size_t>(),
              py::arg("challenges"), py::arg("num_generators"))
         .def(py::init<std::vector<Word>, size_t, ScorerConfig>(),
@@ -148,7 +152,7 @@ void init_pattern_boost(py::module_& parent) {
              py::arg("fw"), py::arg("rm"));
 
     // --- HammingScorer ---
-    py::class_<HammingScorer, WordScorer>(pb, "HammingScorer")
+    py::class_<HammingScorer, WordScorer, std::shared_ptr<HammingScorer>>(pb, "HammingScorer")
         .def(py::init<std::vector<Word>>(),
              py::arg("challenges"))
         .def(py::init<std::vector<Word>, ScorerConfig>(),
@@ -161,7 +165,7 @@ void init_pattern_boost(py::module_& parent) {
              py::arg("fw"), py::arg("rm"));
 
     // --- EditScorer ---
-    py::class_<EditScorer, WordScorer>(pb, "EditScorer")
+    py::class_<EditScorer, WordScorer, std::shared_ptr<EditScorer>>(pb, "EditScorer")
         .def(py::init<std::vector<Word>>(),
              py::arg("challenges"))
         .def(py::init<std::vector<Word>, ScorerConfig>(),
@@ -172,6 +176,84 @@ void init_pattern_boost(py::module_& parent) {
         .def("score_sample",
              &EditScorer::scoreSample,
              py::arg("fw"), py::arg("rm"));
+
+    // --- WordProductLengthScorer ---
+    py::class_<WordProductLengthScorer, WordScorer, std::shared_ptr<WordProductLengthScorer>>(pb, "WordProductLengthScorer")
+        .def(py::init<std::vector<Word>>(),
+             py::arg("challenges"))
+        .def(py::init<std::vector<Word>, ScorerConfig>(),
+             py::arg("challenges"), py::arg("config"))
+        .def("score_word",
+             &WordProductLengthScorer::scoreWord,
+             py::arg("word"))
+        .def("score_sample",
+             &WordProductLengthScorer::scoreSample,
+             py::arg("fw"), py::arg("rm"));
+
+    // --- AbelianizedProductLengthScorer ---
+    py::class_<AbelianizedProductLengthScorer, WordScorer, std::shared_ptr<AbelianizedProductLengthScorer>>(pb, "AbelianizedProductLengthScorer")
+        .def(py::init<std::vector<Word>, size_t>(),
+             py::arg("challenges"), py::arg("num_generators"))
+        .def(py::init<std::vector<Word>, size_t, int>(),
+             py::arg("challenges"), py::arg("num_generators"), py::arg("q"))
+        .def(py::init<std::vector<Word>, size_t, int, ScorerConfig>(),
+             py::arg("challenges"), py::arg("num_generators"), py::arg("q"), py::arg("config"))
+        .def("score_word",
+             &AbelianizedProductLengthScorer::scoreWord,
+             py::arg("word"))
+        .def("score_sample",
+             &AbelianizedProductLengthScorer::scoreSample,
+             py::arg("fw"), py::arg("rm"));
+
+    // --- HighPowerCountScorer ---
+    py::class_<HighPowerCountScorer, WordScorer, std::shared_ptr<HighPowerCountScorer>>(pb, "HighPowerCountScorer")
+        .def(py::init<>())
+        .def(py::init<double>(),
+             py::arg("threshold"))
+        .def(py::init<double, ScorerConfig>(),
+             py::arg("threshold"), py::arg("config"))
+        .def("score_word",
+             &HighPowerCountScorer::scoreWord,
+             py::arg("word"))
+        .def("score_sample",
+             &HighPowerCountScorer::scoreSample,
+             py::arg("fw"), py::arg("rm"));
+
+    // --- LengthRangeScorer ---
+    py::class_<LengthRangeScorer, WordScorer, std::shared_ptr<LengthRangeScorer>>(pb, "LengthRangeScorer")
+        .def(py::init<double, double, double>(),
+             py::arg("min_length"), py::arg("max_length"), py::arg("sigma"))
+        .def(py::init<double, double, double, ScorerConfig>(),
+             py::arg("min_length"), py::arg("max_length"), py::arg("sigma"), py::arg("config"))
+        .def("score_word",
+             &LengthRangeScorer::scoreWord,
+             py::arg("word"))
+        .def("score_sample",
+             &LengthRangeScorer::scoreSample,
+             py::arg("fw"), py::arg("rm"));
+
+    pb.def("length_range_score", &lengthRangeScore,
+           py::arg("length"), py::arg("min_length"), py::arg("max_length"), py::arg("sigma"));
+
+    // --- HybridScorer ---
+    // Sub-scorers are passed as shared_ptr<WordScorer> via pybind11/stl.h auto-conversion
+    // of list[(scorer, weight)] -> vector<pair<shared_ptr<WordScorer>, double>>.
+    py::class_<HybridScorer, WordScorer, std::shared_ptr<HybridScorer>>(pb, "HybridScorer")
+        .def("score_word",
+             &HybridScorer::scoreWord,
+             py::arg("word"))
+        .def("score_sample",
+             &HybridScorer::scoreSample,
+             py::arg("fw"), py::arg("rm"))
+        .def("score_word_components",
+             &HybridScorer::scoreWordComponents,
+             py::arg("word"));
+
+    pb.def("make_hybrid_scorer",
+        [](std::vector<std::pair<std::shared_ptr<WordScorer>, double>> pairs, ScorerConfig config) {
+            return makeHybridScorer(std::move(pairs), std::move(config));
+        },
+        py::arg("pairs"), py::arg("config") = ScorerConfig{});
 
     // --- ConjMoveStrategy ---
     py::enum_<ConjMoveStrategy>(pb, "ConjMoveStrategy")
@@ -247,6 +329,36 @@ void init_pattern_boost(py::module_& parent) {
             [](const RelatorMap& rm, EditScorer scorer, LocalSearchConfig cfg) {
                 return std::make_unique<LocalSearcher>(
                     rm, std::make_unique<EditScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
+            [](const RelatorMap& rm, WordProductLengthScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<WordProductLengthScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
+            [](const RelatorMap& rm, AbelianizedProductLengthScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<AbelianizedProductLengthScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
+            [](const RelatorMap& rm, HighPowerCountScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<HighPowerCountScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
+            [](const RelatorMap& rm, LengthRangeScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<LengthRangeScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
+            [](const RelatorMap& rm, HybridScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<HybridScorer>(std::move(scorer)), cfg);
             }),
             py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
         .def("score_word", &LocalSearcher::scoreWord, py::arg("word"))

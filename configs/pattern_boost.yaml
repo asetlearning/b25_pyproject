@@ -61,8 +61,15 @@ local_search:
   conj_move_strategy: deterministic  # deterministic | random
 
 scoring:
-  type: edit  # hellinger | hamming | edit
+  type: hybrid  # hellinger | hamming | edit | word_product_length | abelianized_product_length | high_power_count | length_range | hybrid
   reduce2_5: false  # apply greedy 2.5 reduction to word before scoring
+  penalize_trivial: false  # score 0.0 for words that reduce to the identity
+  # For hybrid type, uncomment and populate components:
+  components:
+     - {type: edit, weight: 1.0}
+     - {type: abelianized_product_length, weight: 0.5, params: {q: 5}}
+#     - {type: high_power_count, weight: 0.5, params: {threshold: 2.5}}
+#     - {type: length_range, weight: 0.5, params: {min_length: 20, max_length: 80, sigma: 10}}
 
 workflow:
   num_iterations: 20
