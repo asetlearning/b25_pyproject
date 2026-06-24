@@ -14,7 +14,7 @@ PatternBoost is a local-search framework for generating trivial words in B(2,5) 
 |------|----------|
 | `pb_relator_map.h/cpp` | `RelatorMap`, `Factor`, `buildStandardRelators` |
 | `pb_sample_generator.h/cpp` | `FactoredWord`, `SampleConfig`, `generateWord/s`, JSON I/O |
-| `pb_scoring.h/cpp` | `BigramFrequencies`, `HellingerScorer`, `loadChallenges` |
+| `pb_scoring.h/cpp` | `WordScorer` (abstract), `HellingerScorer`, `HammingScorer`, `EditScorer`, `WordProductLengthScorer`, `AbelianizedProductLengthScorer`, `HighPowerCountScorer`, `LengthRangeScorer`, `HybridScorer`, `BigramFrequencies`, `loadChallenges` |
 | `pb_local_search.h/cpp` | `LocalSearchConfig`, `LocalSearcher` |
 
 ### Python bindings (`tcgraph_ext.pattern_boost`)
@@ -26,12 +26,16 @@ Exposed as a submodule of `tcgraph_ext` (same `.so` as the rest of the C++ inter
 Thin re-export layer over `tcgraph_ext.pattern_boost`. Use this in experiments — it mirrors the style of `algorithms/word_problem.py`.
 
 ```python
-from algorithms.pattern_boost import (
+from algorithms.pattern_boost.pb_tcgraph import (
     RelatorMap, SampleConfig, LocalSearchConfig, LocalSearcher,
-    HellingerScorer, BigramFrequencies,
+    HellingerScorer, HammingScorer, EditScorer,
+    WordProductLengthScorer, AbelianizedProductLengthScorer,
+    HighPowerCountScorer, LengthRangeScorer, HybridScorer,
+    BigramFrequencies, ScorerConfig,
     build_standard_relators, generate_word, generate_words,
     load_challenges, to_json, from_json,
     uniform_len, zero_heavy_len, geometric_len, constant_len,
+    make_hybrid_scorer,
     score_word,   # convenience: accepts str or Word
 )
 ```
@@ -83,11 +87,32 @@ constant_len(len)                     # always exactly len
 | `max_factors` | 20 | don't insert above this |
 
 ### Scoring
-`HellingerScorer.score_sample(fw, rm, challenge_freqs)` returns a score in `[0, 1]`:
-- `1.0` = perfect bigram match to some challenge word
-- `0.0` = maximally dissimilar to all challenges
 
-Score is `max over challenges of (1 - hellinger_distance(bigram(expanded), bigram(challenge)))`.
+All scorers share the same interface: challenges are baked in at construction; `scoreWord`/`scoreSample` take only the query. All scores are in `[0, 1]` (higher = more similar to at least one challenge).
+
+| Type key | Class | Constructor inputs | Notes |
+|---|---|---|---|
+| `hellinger` | `HellingerScorer` | challenges, num_generators | Hellinger distance on bigram-frequency histograms |
+| `hamming` | `HammingScorer` | challenges | Extended Hamming distance, normalized by max length |
+| `edit` | `EditScorer` | challenges | Levenshtein edit distance, normalized by max length |
+| `word_product_length` | `WordProductLengthScorer` | challenges | Free-group metric: `len(reduce(w·c⁻¹)) / (|w|+|c|)` |
+| `abelianized_product_length` | `AbelianizedProductLengthScorer` | challenges, num_generators, q=5 | Distance in `Z_q^n` abelian quotient |
+| `high_power_count` | `HighPowerCountScorer` | threshold=2.5 | 1.0 = no subword power > threshold; no challenges needed |
+| `length_range` | `LengthRangeScorer` | min_length, max_length, sigma | Gaussian score peaked at target length range; no challenges needed |
+| `hybrid` | `HybridScorer` | sub-scorers + weights | Weighted sum; built via `make_hybrid_scorer` or YAML `components` |
+
+Use `make_scorer(type, challenges, num_generators)` from `algorithms.pattern_boost.common` to build any scorer by name, or build directly from the class. For hybrid:
+
+```python
+from algorithms.pattern_boost.common import make_scorer
+scorer = make_scorer("hybrid", challenge_words, num_generators=2, components=[
+    {"type": "edit", "weight": 1.0},
+    {"type": "abelianized_product_length", "weight": 0.5, "params": {"q": 5}},
+    {"type": "high_power_count", "weight": 0.5, "params": {"threshold": 2.5}},
+])
+```
+
+Sub-scorers in a hybrid always use default `ScorerConfig`; compression and `reduce2_5` are applied once by the outer `HybridScorer`.
 
 ### JSON I/O
 ```python
@@ -111,30 +136,35 @@ JSON structure:
 
 ```python
 from algorithms.word_problem import word_from_str
-from algorithms.pattern_boost import (
+from algorithms.pattern_boost.common import make_scorer, load_challenges
+from algorithms.pattern_boost.pb_tcgraph import (
     RelatorMap, SampleConfig, LocalSearchConfig, LocalSearcher,
-    BigramFrequencies, HellingerScorer, generate_words, uniform_len,
+    generate_words, uniform_len,
 )
 
 # 1. Build RelatorMap
 rm = RelatorMap([(name, word_from_str(w)) for name, w in my_relators])
 
-# 2. Build challenge frequencies
-challenge_freqs = [BigramFrequencies(word_from_str(w), 2) for w in challenge_words]
+# 2. Load challenges (baked into scorer at construction)
+challenge_words, _ = load_challenges("data/my_challenges.json")
 
-# 3. Generate samples
+# 3. Build scorer
+scorer = make_scorer("edit", challenge_words, num_generators=2)
+# Hybrid example:
+# scorer = make_scorer("hybrid", challenge_words, num_generators=2, components=[
+#     {"type": "edit", "weight": 1.0},
+#     {"type": "high_power_count", "weight": 0.5, "params": {"threshold": 2.5}},
+# ])
+
+# 4. Generate samples
 cfg = SampleConfig()
 cfg.conj_len = uniform_len(4)
 samples = generate_words(rm, cfg, count=50, seed=42)
 
-# 4. Score before search
-scorer = HellingerScorer()
-before = [scorer.score_sample(fw, rm, challenge_freqs) for fw in samples]
-
 # 5. Local search
 ls_cfg = LocalSearchConfig()
 ls_cfg.max_steps = 100
-searcher = LocalSearcher(rm, challenge_freqs, ls_cfg)
+searcher = LocalSearcher(rm, scorer, ls_cfg)
 results = [searcher.search(fw, seed=42 + i) for i, fw in enumerate(samples)]
 ```
 
@@ -199,14 +229,17 @@ Recently-added knobs worth knowing:
 | `tokenizer.use_bpe` (default `false`) + `vocab_size` | BPE merges on top of structured FactoredWord tokens. |
 | `workflow.train_from_scratch` | Rebuild model with fresh weights each iteration (uses `_release_model` to free GPU/MPS memory). |
 | `workflow.max_pool_size` | Initial pool truncated by score (highest kept). |
-| `scoring.type` | `hellinger | hamming | edit`. |
+| `scoring.type` | `hellinger \| hamming \| edit \| word_product_length \| abelianized_product_length \| high_power_count \| length_range \| hybrid`. |
+| `scoring.components` | Required when `scoring.type: hybrid`. List of `{type, weight, params?}` dicts. `params` keys: `q` (abelianized), `threshold` (high_power_count), `min_length`/`max_length`/`sigma` (length_range). Sub-scorers always use default `ScorerConfig`. |
 | `init_model_from` | Warm-start LM from a previous run's checkpoint dir (e.g. `.../iter_0009/model`). |
 
 Provided configs in `configs/`:
-- `pattern_boost.yaml` — full workflow
+- `pattern_boost.yaml` — full workflow (includes commented-out hybrid scoring example)
+- `pattern_boost_2_5_reduced.yaml` — challenges from 2.5-reduced shortlex KB rules
 - `pattern_boost_smoke.yaml` — 2-iteration smoke test
 - `train_from_factor_words.yaml`
 - `experiment1_local_search.yaml`
+- `pattern_boost_sweep.yaml` / `pattern_boost_sweep_1.yaml` — hyperparameter sweeps
 - `bpe_train.yaml`
 - `generate_sample.yaml`
 

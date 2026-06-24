@@ -27,6 +27,7 @@ local_search:
 sweep:
   max_steps: [10]
   beam_width: [10]
-  score_types: ["hellinger", "hamming", "edit"]   # any subset of: hellinger, hamming, edit
+  score_types: ["hellinger", "hamming", "edit"]   # any subset of: hellinger, hamming, edit, word_product_length, abelianized_product_length, high_power_count, length_range
+  # Note: hybrid is not listable here — use pattern_boost_main.py with scoring.type: hybrid in workflow config
 
 workers: 10

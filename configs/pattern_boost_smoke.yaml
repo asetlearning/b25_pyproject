@@ -52,7 +52,8 @@ local_search:
   conj_max_len: 3
 
 scoring:
-  type: hellinger
+  type: hellinger  # hellinger | hamming | edit | word_product_length | abelianized_product_length | high_power_count | length_range | hybrid
+  penalize_trivial: false
 
 workflow:
   num_iterations: 2

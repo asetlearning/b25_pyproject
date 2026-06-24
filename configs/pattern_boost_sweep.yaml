@@ -14,7 +14,7 @@ num_trials: 3  # runs per param combo; each uses a non-overlapping challenge sam
 # Cartesian product of all lists below — one combo per combination.
 # Keys are dot-notation paths into WorkflowConfig (see workflow.py).
 params:
-  scoring.type: [hellinger, hamming]
+  scoring.type: [hellinger, hamming]  # also valid: edit, word_product_length, abelianized_product_length, high_power_count, length_range
   local_search.beam_width: [1, 5]
   workflow.max_pool_size: [100, 500]
 
