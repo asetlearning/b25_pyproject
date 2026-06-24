@@ -343,6 +343,8 @@ def check_stopping_criteria(
 
     cand_lengths = []
     cand_red_lengths = []
+    nonzero_red_count = 0
+    top3_reduced: list[dict] = []
     for score, fw in results:
         expanded_word = ctx.rm.expand(fw.factors)
         if ctx.compressor:
@@ -366,6 +368,10 @@ def check_stopping_criteria(
         cand_red = greedy_reduce2_5(cand_str)
         cand_lengths.append(len(cand_str))
         cand_red_lengths.append(len(cand_red))
+        if len(cand_red) > 0:
+            nonzero_red_count += 1
+        if len(top3_reduced) < 3:
+            top3_reduced.append({'score': float(score), 'word': cand_red, 'len': len(cand_red)})
 
         doubled = cand_str + cand_str
         for name, chal_str in ctx.challenge_strs.items():
@@ -419,7 +425,9 @@ def check_stopping_criteria(
             'avg_goal': statistics.mean([len(chal_str) for chal_str in ctx.challenge_strs.values()]),
         }
         log_structured(ctx.logger, 'info', event='pb_candidate_2.5_reduced_length_stats',
-                       iteration=iteration, **red_length_stats)
+                       iteration=iteration, **red_length_stats,
+                       nonzero_reduced_count=nonzero_red_count,
+                       top3_reduced_words=top3_reduced)
 
     return terminate, first_match
 
