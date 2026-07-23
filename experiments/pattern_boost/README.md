@@ -56,6 +56,8 @@ Maps 1-based indices to relator `Word` objects. Two constructors:
 - `RelatorMap(list[Word])` — auto-names R1, R2, …
 - `RelatorMap(list[tuple[str, Word]])` — named relators
 
+In the full workflow, the RelatorMap is either **generated** (standard `build_hybrid_relators` procedure, controlled by `relators.max_relator_len` and `relators.num_generators`) or **loaded from a file** (set `relators.relators_file` to a path; names from the JSON keys are preserved).
+
 ### SampleConfig
 
 | Field | Default | Meaning |
@@ -232,6 +234,7 @@ Recently-added knobs worth knowing:
 | `scoring.type` | `hellinger \| hamming \| edit \| word_product_length \| abelianized_product_length \| high_power_count \| length_range \| hybrid`. |
 | `scoring.components` | Required when `scoring.type: hybrid`. List of `{type, weight, params?}` dicts. `params` keys: `q` (abelianized), `threshold` (high_power_count), `min_length`/`max_length`/`sigma` (length_range). Sub-scorers always use default `ScorerConfig`. |
 | `init_model_from` | Warm-start LM from a previous run's checkpoint dir (e.g. `.../iter_0009/model`). |
+| `relators.relators_file` | Path to a JSON relators file (`{"R1": {"version": 1, "word": [...]}, ...}`). When set, the RelatorMap is loaded from this file instead of being generated via `build_hybrid_relators`. `relators.num_generators` is still required for the scorer and tokenizer. |
 
 Provided configs in `configs/`:
 - `pattern_boost.yaml` — full workflow (includes commented-out hybrid scoring example)
