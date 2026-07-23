@@ -98,7 +98,7 @@ All scorers share the same interface: challenges are baked in at construction; `
 | `word_product_length` | `WordProductLengthScorer` | challenges | Free-group metric: `len(reduce(w·c⁻¹)) / (|w|+|c|)` |
 | `abelianized_product_length` | `AbelianizedProductLengthScorer` | challenges, num_generators, q=5 | Distance in `Z_q^n` abelian quotient |
 | `high_power_count` | `HighPowerCountScorer` | threshold=2.5 | 1.0 = no subword power > threshold; no challenges needed |
-| `length_range` | `LengthRangeScorer` | min_length, max_length, sigma | Gaussian score peaked at target length range; no challenges needed |
+| `length_range` | `LengthRangeScorer` | min_length, max_length, sigma, reduce_before_scoring=false | Gaussian score peaked at target length range; no challenges needed; when `reduce_before_scoring=true` scores the 2.5-reduced length |
 | `hybrid` | `HybridScorer` | sub-scorers + weights | Weighted sum; built via `make_hybrid_scorer` or YAML `components` |
 
 Use `make_scorer(type, challenges, num_generators)` from `algorithms.pattern_boost.common` to build any scorer by name, or build directly from the class. For hybrid:
@@ -230,7 +230,7 @@ Recently-added knobs worth knowing:
 | `workflow.train_from_scratch` | Rebuild model with fresh weights each iteration (uses `_release_model` to free GPU/MPS memory). |
 | `workflow.max_pool_size` | Initial pool truncated by score (highest kept). |
 | `scoring.type` | `hellinger \| hamming \| edit \| word_product_length \| abelianized_product_length \| high_power_count \| length_range \| hybrid`. |
-| `scoring.components` | Required when `scoring.type: hybrid`. List of `{type, weight, params?}` dicts. `params` keys: `q` (abelianized), `threshold` (high_power_count), `min_length`/`max_length`/`sigma` (length_range). Sub-scorers always use default `ScorerConfig`. |
+| `scoring.components` | Required when `scoring.type: hybrid`. List of `{type, weight, params?}` dicts. `params` keys: `q` (abelianized), `threshold` (high_power_count), `min_length`/`max_length`/`sigma`/`reduce_before_scoring` (length_range). Sub-scorers always use default `ScorerConfig`. |
 | `init_model_from` | Warm-start LM from a previous run's checkpoint dir (e.g. `.../iter_0009/model`). |
 
 Provided configs in `configs/`:

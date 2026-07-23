@@ -58,6 +58,7 @@ def make_scorer(score_type: str, challenges, num_generators: int, config=None, c
             float(p.get('min_length', 10.0)),
             float(p.get('max_length', 100.0)),
             float(p.get('sigma', 10.0)),
+            bool(p.get('reduce_before_scoring', False)),
             *extra)
     if t == 'hybrid':
         if not components:
@@ -94,7 +95,8 @@ def _make_sub_scorer(score_type: str, challenges, num_generators: int, params: d
         return LengthRangeScorer(
             float(params.get('min_length', 10.0)),
             float(params.get('max_length', 100.0)),
-            float(params.get('sigma', 10.0)))
+            float(params.get('sigma', 10.0)),
+            bool(params.get('reduce_before_scoring', False)))
     raise ValueError(f'unknown sub-scorer type: {score_type!r}')
 
 

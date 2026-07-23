@@ -27,7 +27,7 @@ from tqdm import tqdm
 
 import tcgraph_ext as _ext
 from algorithms.logger import configure_logging, log_structured
-from algorithms.word_problem import word_from_str, word_to_str, greedy_reduce2_5
+from algorithms.word_problem import word_from_str, word_to_str, greedy_reduce2_5, greedy_reduce_cyclic_exhaustive2_5
 from algorithms.pattern_boost.common import load_challenges, make_scorer
 from algorithms.pattern_boost.model import (
     ModelConfig,
@@ -365,7 +365,8 @@ def check_stopping_criteria(
                            )
             continue
 
-        cand_red = greedy_reduce2_5(cand_str)
+#        cand_red = greedy_reduce2_5(cand_str)
+        cand_red = greedy_reduce_cyclic_exhaustive2_5(cand_str)
         cand_lengths.append(len(cand_str))
         cand_red_lengths.append(len(cand_red))
         if len(cand_red) > 0:
