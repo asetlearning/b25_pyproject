@@ -68,8 +68,8 @@ scoring:
   components:
 #     - {type: edit, weight: 1.0}
 #     - {type: abelianized_product_length, weight: 0.5, params: {q: 5}}
-     - {type: high_power_count, weight: 1.0, params: {threshold: 2.5}}
-     - {type: length_range, weight: 0.5, params: {min_length: 150, max_length: 250, sigma: 50}}
+#     - {type: high_power_count, weight: 1.0, params: {threshold: 2.5}}
+     - {type: length_range, weight: 1.0, params: {min_length: 50, max_length: 250, sigma: 200, reduce_before_scoring: true}}
 
 workflow:
   num_iterations: 20

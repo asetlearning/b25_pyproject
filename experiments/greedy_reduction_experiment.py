@@ -224,11 +224,14 @@ def main():
 
 
 if __name__ == "__main__":
-    from algorithms.word_problem import greedy_reduce_cyclic_exhaustive2_5
+    from algorithms.word_problem import greedy_reduce_cyclic_exhaustive2_5, greedy_reduce2_5
 #    w = "ABabAbabABaBAbabABABabAbaBABaBAbabb"
 #    w  = "ABABabAbaBaBAbabaaBABabAbaBaBAbabaBABabAbABaBAbabaBABabAbaBaBAbabABABabAbABaBAbabaaBABabAbABaBAbabAABABabAbaBaBAbabaBABabAbABaBAbabABABabAbaBaBAbabABABabAbABaBAbabA"
 #    w = "aaBaaaaBaaaaBaaaaBaaaaBaabbABBBaBBBBaBBBBaBBBBaBBBBaBaBBAbabABAABAABAABAABABABaBBBBBBABBBBABBBBABBBBABBBBAbAbbabbabbabbabbaabABBABBaaBBBaaBBBaaBBBaaBBBaaBabbaabbAABabAABabAABabAABabAABaBBaaaBaaaBaaaBaaaBaa"
-#    print(len(w), ": ", w)
-#    reduced_word = greedy_reduce_cyclic_exhaustive2_5(w, [0, 0.5])
-#    print(len(reduced_word), ": ", reduced_word)
-    main()
+    w = "BAbABAbABAbABAbABAbbbAAbbAAAbbAAAbbAAAbbAAAbbABBAbaBabbaBabbaBabbaBabbaBaBabAAAAAAAAAABAbbbABaaBBaaaBBaaaBBaaaBBaaaBBabaBaabaaaabaaaabaaaabaaaaaabAABabAABabAABabAABabAABAbaa"
+    w = "AAAABAAABAABAABAABAABabAABBBAbABAbABAbABAbABAbAbba"
+    print(len(w), ": ", w)
+    # reduced_word = greedy_reduce_cyclic_exhaustive2_5(w, [0, 0.5])
+    reduced_word = greedy_reduce2_5(w)
+    print(len(reduced_word), ": ", reduced_word)
+#    main()

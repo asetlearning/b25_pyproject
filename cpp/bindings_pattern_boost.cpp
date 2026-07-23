@@ -223,8 +223,12 @@ void init_pattern_boost(py::module_& parent) {
     py::class_<LengthRangeScorer, WordScorer, std::shared_ptr<LengthRangeScorer>>(pb, "LengthRangeScorer")
         .def(py::init<double, double, double>(),
              py::arg("min_length"), py::arg("max_length"), py::arg("sigma"))
-        .def(py::init<double, double, double, ScorerConfig>(),
-             py::arg("min_length"), py::arg("max_length"), py::arg("sigma"), py::arg("config"))
+        .def(py::init<double, double, double, bool>(),
+             py::arg("min_length"), py::arg("max_length"), py::arg("sigma"),
+             py::arg("reduce_before_scoring"))
+        .def(py::init<double, double, double, bool, ScorerConfig>(),
+             py::arg("min_length"), py::arg("max_length"), py::arg("sigma"),
+             py::arg("reduce_before_scoring"), py::arg("config"))
         .def("score_word",
              &LengthRangeScorer::scoreWord,
              py::arg("word"))
