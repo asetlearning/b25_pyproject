@@ -14,6 +14,7 @@ from algorithms.word_conversion import word_to_string
 from algorithms.word_problem import word_from_str
 from algorithms.pattern_boost.pb_tcgraph import (
     AbelianizedProductLengthScorer,
+    DehnFunctionScorer,
     EditScorer,
     HammingScorer,
     HellingerScorer,
@@ -60,6 +61,8 @@ def make_scorer(score_type: str, challenges, num_generators: int, config=None, c
             float(p.get('sigma', 10.0)),
             bool(p.get('reduce_before_scoring', False)),
             *extra)
+    if t == 'dehn_function':
+        return DehnFunctionScorer(*extra)
     if t == 'hybrid':
         if not components:
             raise ValueError('hybrid scorer requires a non-empty components list')
@@ -97,6 +100,8 @@ def _make_sub_scorer(score_type: str, challenges, num_generators: int, params: d
             float(params.get('max_length', 100.0)),
             float(params.get('sigma', 10.0)),
             bool(params.get('reduce_before_scoring', False)))
+    if t == 'dehn_function':
+        raise ValueError('dehn_function cannot be used as a HybridScorer sub-scorer (scoreWordImpl is not supported)')
     raise ValueError(f'unknown sub-scorer type: {score_type!r}')
 
 

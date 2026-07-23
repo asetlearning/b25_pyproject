@@ -23,6 +23,7 @@ WordProductLengthScorer = _pb.WordProductLengthScorer
 AbelianizedProductLengthScorer = _pb.AbelianizedProductLengthScorer
 HighPowerCountScorer = _pb.HighPowerCountScorer
 LengthRangeScorer = _pb.LengthRangeScorer
+DehnFunctionScorer = _pb.DehnFunctionScorer
 HybridScorer = _pb.HybridScorer
 ConjMoveStrategy = _pb.ConjMoveStrategy
 LocalSearchConfig = _pb.LocalSearchConfig
