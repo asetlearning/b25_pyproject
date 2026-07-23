@@ -29,6 +29,7 @@ import tcgraph_ext as _ext
 from algorithms.logger import configure_logging, log_structured
 from algorithms.word_problem import word_from_str, word_to_str, greedy_reduce2_5, greedy_reduce_cyclic_exhaustive2_5
 from algorithms.pattern_boost.common import load_challenges, make_scorer
+from data.relators_io import load_relators
 from algorithms.pattern_boost.model import (
     ModelConfig,
     SampleGenConfig,
@@ -92,6 +93,7 @@ class RelatorsCfg:
     max_relator_len: int = 5
     num_generators: int = 2
     standard_generator_tokens: Optional[list[str]] = None  # resolved to indices via compressor
+    relators_file: Optional[str] = None  # if set, load relators from JSON file instead of generating
 
 
 @dataclass
@@ -462,13 +464,23 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
         num_generators = compressor.num_generators
 
     # ====== PHASE 2: Build relator map and load challenges ======
-    std_gens = None
-    if cfg.relators.standard_generator_tokens is not None:
-        if compressor is None:
-            raise ValueError("standard_generator_tokens requires use_compression=true")
-        std_gens = _resolve_standard_generators(cfg.relators.standard_generator_tokens, compressor)
-    rm = RelatorMap(build_hybrid_relators(cfg.relators.max_relator_len, num_generators, std_gens))
-    log_structured(logger, 'info', event='pb_relator_map_built', size=len(rm))
+    if cfg.relators.relators_file is not None:
+        raw = load_relators(cfg.relators.relators_file)
+        named_relators = [
+            (name, _ext.Word(entry['word']))
+            for name, entry in raw.items()
+        ]
+        rm = RelatorMap(named_relators)
+        log_structured(logger, 'info', event='pb_relator_map_built', size=len(rm),
+                       source='file', path=cfg.relators.relators_file)
+    else:
+        std_gens = None
+        if cfg.relators.standard_generator_tokens is not None:
+            if compressor is None:
+                raise ValueError("standard_generator_tokens requires use_compression=true")
+            std_gens = _resolve_standard_generators(cfg.relators.standard_generator_tokens, compressor)
+        rm = RelatorMap(build_hybrid_relators(cfg.relators.max_relator_len, num_generators, std_gens))
+        log_structured(logger, 'info', event='pb_relator_map_built', size=len(rm), source='generated')
 
     if not cfg.challenges.path:
         raise ValueError('challenges.path must be set in config')
