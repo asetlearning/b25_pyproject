@@ -219,6 +219,16 @@ void init_pattern_boost(py::module_& parent) {
              &HighPowerCountScorer::scoreSample,
              py::arg("fw"), py::arg("rm"));
 
+    // --- DehnFunctionScorer ---
+    // score_word / scoreWordImpl throws; use score_sample only.
+    py::class_<DehnFunctionScorer, WordScorer, std::shared_ptr<DehnFunctionScorer>>(pb, "DehnFunctionScorer")
+        .def(py::init<>())
+        .def(py::init<ScorerConfig>(),
+             py::arg("config"))
+        .def("score_sample",
+             &DehnFunctionScorer::scoreSample,
+             py::arg("fw"), py::arg("rm"));
+
     // --- LengthRangeScorer ---
     py::class_<LengthRangeScorer, WordScorer, std::shared_ptr<LengthRangeScorer>>(pb, "LengthRangeScorer")
         .def(py::init<double, double, double>(),

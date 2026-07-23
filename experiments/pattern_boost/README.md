@@ -14,7 +14,7 @@ PatternBoost is a local-search framework for generating trivial words in B(2,5) 
 |------|----------|
 | `pb_relator_map.h/cpp` | `RelatorMap`, `Factor`, `buildStandardRelators` |
 | `pb_sample_generator.h/cpp` | `FactoredWord`, `SampleConfig`, `generateWord/s`, JSON I/O |
-| `pb_scoring.h/cpp` | `WordScorer` (abstract), `HellingerScorer`, `HammingScorer`, `EditScorer`, `WordProductLengthScorer`, `AbelianizedProductLengthScorer`, `HighPowerCountScorer`, `LengthRangeScorer`, `HybridScorer`, `BigramFrequencies`, `loadChallenges` |
+| `pb_scoring.h/cpp` | `WordScorer` (abstract), `HellingerScorer`, `HammingScorer`, `EditScorer`, `WordProductLengthScorer`, `AbelianizedProductLengthScorer`, `HighPowerCountScorer`, `LengthRangeScorer`, `DehnFunctionScorer`, `HybridScorer`, `BigramFrequencies`, `loadChallenges` |
 | `pb_local_search.h/cpp` | `LocalSearchConfig`, `LocalSearcher` |
 
 ### Python bindings (`tcgraph_ext.pattern_boost`)
@@ -30,7 +30,7 @@ from algorithms.pattern_boost.pb_tcgraph import (
     RelatorMap, SampleConfig, LocalSearchConfig, LocalSearcher,
     HellingerScorer, HammingScorer, EditScorer,
     WordProductLengthScorer, AbelianizedProductLengthScorer,
-    HighPowerCountScorer, LengthRangeScorer, HybridScorer,
+    HighPowerCountScorer, LengthRangeScorer, DehnFunctionScorer, HybridScorer,
     BigramFrequencies, ScorerConfig,
     build_standard_relators, generate_word, generate_words,
     load_challenges, to_json, from_json,
@@ -101,6 +101,7 @@ All scorers share the same interface: challenges are baked in at construction; `
 | `abelianized_product_length` | `AbelianizedProductLengthScorer` | challenges, num_generators, q=5 | Distance in `Z_q^n` abelian quotient |
 | `high_power_count` | `HighPowerCountScorer` | threshold=2.5 | 1.0 = no subword power > threshold; no challenges needed |
 | `length_range` | `LengthRangeScorer` | min_length, max_length, sigma, reduce_before_scoring=false | Gaussian score peaked at target length range; no challenges needed; when `reduce_before_scoring=true` scores the 2.5-reduced length |
+| `dehn_function` | `DehnFunctionScorer` | — | `\|factors\| / \|free-reduced word\|`; approximates Dehn function; unbounded above 1; **use `score_sample` only** — `score_word` throws; cannot be used inside `hybrid` or `LocalSearcher` |
 | `hybrid` | `HybridScorer` | sub-scorers + weights | Weighted sum; built via `make_hybrid_scorer` or YAML `components` |
 
 Use `make_scorer(type, challenges, num_generators)` from `algorithms.pattern_boost.common` to build any scorer by name, or build directly from the class. For hybrid:
@@ -231,7 +232,7 @@ Recently-added knobs worth knowing:
 | `tokenizer.use_bpe` (default `false`) + `vocab_size` | BPE merges on top of structured FactoredWord tokens. |
 | `workflow.train_from_scratch` | Rebuild model with fresh weights each iteration (uses `_release_model` to free GPU/MPS memory). |
 | `workflow.max_pool_size` | Initial pool truncated by score (highest kept). |
-| `scoring.type` | `hellinger \| hamming \| edit \| word_product_length \| abelianized_product_length \| high_power_count \| length_range \| hybrid`. |
+| `scoring.type` | `hellinger \| hamming \| edit \| word_product_length \| abelianized_product_length \| high_power_count \| length_range \| dehn_function \| hybrid`. |
 | `scoring.components` | Required when `scoring.type: hybrid`. List of `{type, weight, params?}` dicts. `params` keys: `q` (abelianized), `threshold` (high_power_count), `min_length`/`max_length`/`sigma`/`reduce_before_scoring` (length_range). Sub-scorers always use default `ScorerConfig`. |
 | `init_model_from` | Warm-start LM from a previous run's checkpoint dir (e.g. `.../iter_0009/model`). |
 | `relators.relators_file` | Path to a JSON relators file (`{"R1": {"version": 1, "word": [...]}, ...}`). When set, the RelatorMap is loaded from this file instead of being generated via `build_hybrid_relators`. `relators.num_generators` is still required for the scorer and tokenizer. |
