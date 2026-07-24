@@ -370,12 +370,23 @@ void init_pattern_boost(py::module_& parent) {
             }),
             py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
         .def(py::init(
+            [](const RelatorMap& rm, DehnFunctionScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<DehnFunctionScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
+            [](const RelatorMap& rm, DehnFunctionScorer scorer, LocalSearchConfig cfg) {
+                return std::make_unique<LocalSearcher>(
+                    rm, std::make_unique<DehnFunctionScorer>(std::move(scorer)), cfg);
+            }),
+            py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
+        .def(py::init(
             [](const RelatorMap& rm, HybridScorer scorer, LocalSearchConfig cfg) {
                 return std::make_unique<LocalSearcher>(
                     rm, std::make_unique<HybridScorer>(std::move(scorer)), cfg);
             }),
             py::arg("rm"), py::arg("scorer"), py::arg("config") = LocalSearchConfig{})
-        .def("score_word", &LocalSearcher::scoreWord, py::arg("word"))
         .def("neighbors",
             [](const LocalSearcher& ls, const FactoredWord& fw, uint32_t seed) {
                 std::mt19937 rng(seed);

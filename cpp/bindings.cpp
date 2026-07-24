@@ -63,7 +63,11 @@ PYBIND11_MODULE(tcgraph_ext, m) {
         .def("__pow__", [](const Word& w, int p) { return w ^ p; })
         .def("__repr__", &Word::toCString)
         .def("__str__", &Word::toString)
-        .def("__eq__", &Word::operator==);
+        .def("__eq__", &Word::operator==)
+        .def("__hash__", [](const Word& w) {
+            auto h = w.getMurMurHash();
+            return static_cast<Py_hash_t>(h.hash128_.first ^ h.hash128_.second);
+        });
 
 
     m.def("attempt_to_decide_if_trivial",
