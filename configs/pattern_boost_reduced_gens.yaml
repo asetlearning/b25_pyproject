@@ -1,0 +1,91 @@
+# Created by: Alex Myasnikov
+# Date: May 14, 2026
+#
+# Sample PatternBoost workflow config. All fields optional with sensible
+# defaults — see algorithms/pattern_boost/workflow.py for the dataclass schema.
+
+output_dir: output/pattern_boost_reduced_gens
+seed: 12345
+
+relators:
+  max_relator_len: 5
+  num_generators: 2
+#  standard_generator_tokens: ["a", "b"]  # token strings for standard generators; requires use_compression=true
+  relators_file: data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced.json
+
+
+challenges:
+#  path: data/pattern_boost_experiments/relator_sets/relators_shortlex_rules_2.5reduced_1.json
+  path: data/pattern_boost_experiments/relator_sets/relators_sample_n1000_20260519_131825.json
+  sample_size: 1
+
+tokenizer:
+  use_bpe: false   # enable BPE merges on top of structured tokens
+  vocab_size: 512  # only used when use_bpe is true
+
+model:
+  n_layer: 6
+  n_head: 8
+  n_embd: 256
+  n_positions: 2048
+
+training:
+  batch_size: 16
+  epochs: 10
+  lr: 5.0e-4
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 100
+
+initial_sampling:
+  n_initial: 100000
+  min_factors: 10
+  max_factors: 30
+  min_expanded_len: 200
+  conj_len_max: 20
+
+generation:
+  n_samples: 15000
+  max_length: 2048
+  temperature: 1.0
+  top_k: 50
+  top_p: 0.95
+  batch_size: 16
+
+local_search:
+  beam_width: 1 # 1 = greedy
+  max_steps: 10 # 3
+  num_conj_samples: 5 # random conjugator mutations per factor per step (Random strat only)
+  num_insert_samples: 5 # random factor insertions per step
+  conj_max_len: 20 # max conjugator length for mutations/insertions (Random strat only)
+  min_factors: 10 # don't delete below this
+  max_factors: 1000 # don't insert above this'
+  conj_move_strategy: deterministic  # deterministic | random
+
+scoring:
+  type: dehn_function  # hellinger | hamming | edit | word_product_length | abelianized_product_length | high_power_count | length_range | hybrid | dehn_function
+  reduce2_5: false  # apply greedy 2.5 reduction to word before scoring
+  penalize_trivial: false  # score 0.0 for words that reduce to the identity
+  # For hybrid type, uncomment and populate components:
+#  components:
+#     - {type: edit, weight: 1.0}
+#     - {type: abelianized_product_length, weight: 0.5, params: {q: 5}}
+#     - {type: high_power_count, weight: 0.5, params: {threshold: 2.5}}
+#     - {type: length_range, weight: 0.5, params: {min_length: 20, max_length: 80, sigma: 10, reduce_before_scoring: false}}
+
+workflow:
+  num_iterations: 20
+  top_k: 12000
+  max_pool_size: 10000
+  parallel_workers: 12
+  save_every: -1
+  train_from_scratch: false  # rebuild model with fresh weights each iter
+
+logging:
+  level: info
+  log_file: null  # null -> output_dir/run.jsonl
+
+compression:
+  use_compression: false
+  compression_tokenizer: models/tokenizer/compression_bpe_sample_n1000_20260519_131825_relator_R426.json
+#  models/tokenizer/compression_bpe_sample_n1000_20260519_131825.json  # path to BPETokenizerWordCompression model JSON

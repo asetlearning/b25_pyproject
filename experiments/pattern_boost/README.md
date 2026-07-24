@@ -90,7 +90,7 @@ constant_len(len)                     # always exactly len
 
 ### Scoring
 
-All scorers share the same interface: challenges are baked in at construction; `scoreWord`/`scoreSample` take only the query. All scores are in `[0, 1]` (higher = more similar to at least one challenge).
+All scorers share the same interface: challenges are baked in at construction; `score_sample` (or `score_word` for word-only scorers) takes only the query. All scores are in `[0, 1]` (higher = more similar to at least one challenge).
 
 | Type key | Class | Constructor inputs | Notes |
 |---|---|---|---|
@@ -101,7 +101,7 @@ All scorers share the same interface: challenges are baked in at construction; `
 | `abelianized_product_length` | `AbelianizedProductLengthScorer` | challenges, num_generators, q=5 | Distance in `Z_q^n` abelian quotient |
 | `high_power_count` | `HighPowerCountScorer` | threshold=2.5 | 1.0 = no subword power > threshold; no challenges needed |
 | `length_range` | `LengthRangeScorer` | min_length, max_length, sigma, reduce_before_scoring=false | Gaussian score peaked at target length range; no challenges needed; when `reduce_before_scoring=true` scores the 2.5-reduced length |
-| `dehn_function` | `DehnFunctionScorer` | — | `\|factors\| / \|free-reduced word\|`; approximates Dehn function; unbounded above 1; **use `score_sample` only** — `score_word` throws; cannot be used inside `hybrid` or `LocalSearcher` |
+| `dehn_function` | `DehnFunctionScorer` | — | `\|factors\| / \|free-reduced word\|`; approximates Dehn function; unbounded above 1; uses `score_sample` (needs factor count); cannot be used inside `hybrid` |
 | `hybrid` | `HybridScorer` | sub-scorers + weights | Weighted sum; built via `make_hybrid_scorer` or YAML `components` |
 
 Use `make_scorer(type, challenges, num_generators)` from `algorithms.pattern_boost.common` to build any scorer by name, or build directly from the class. For hybrid:

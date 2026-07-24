@@ -466,13 +466,13 @@ def run_pattern_boost(cfg: WorkflowConfig) -> RunSummary:
     # ====== PHASE 2: Build relator map and load challenges ======
     if cfg.relators.relators_file is not None:
         raw = load_relators(cfg.relators.relators_file)
-        named_relators = [
-            (name, _ext.Word(entry['word']))
-            for name, entry in raw.items()
-        ]
+        relators = {_ext.Word(entry['word']) for entry in raw.values()}
+        relators |= {-w for w in relators}
+        named_relators = [(f'R{i}', w) for i, w in enumerate(relators, 1)]
         rm = RelatorMap(named_relators)
         log_structured(logger, 'info', event='pb_relator_map_built', size=len(rm),
-                       source='file', path=cfg.relators.relators_file)
+                       source='file', path=cfg.relators.relators_file,
+                       loaded_from_file=len(raw))
     else:
         std_gens = None
         if cfg.relators.standard_generator_tokens is not None:
